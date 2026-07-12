@@ -68,8 +68,8 @@ export function ContinueLearningCard({
           <div
             className={
               isLight
-                ? "mt-1 h-2 w-3/5 overflow-hidden rounded-full bg-[rgba(138,155,188,0.21)]"
-                : "mt-1 h-2 w-3/5 overflow-hidden rounded-full bg-white/20"
+                ? "mt-1 h-2 w-74.75 overflow-hidden rounded-full bg-[rgba(138,155,188,0.21)]"
+                : "mt-1 h-2 w-74.75 overflow-hidden rounded-full bg-white/20"
             }
           >
             <div
@@ -81,8 +81,8 @@ export function ContinueLearningCard({
         <ChevronIcon
           className={
             isLight
-              ? "absolute top-1/2 right-9 size-3.5 -translate-y-1/2 text-[#8a9bbc]"
-              : "absolute top-1/2 right-9 size-4.5 -translate-y-1/2 text-white"
+              ? "absolute top-1/2 right-3 size-4.5 -translate-y-1/2 text-[#8a9bbc]"
+              : "absolute top-1/2 right-3 size-4.5 -translate-y-1/2 text-white"
           }
         />
       </div>
