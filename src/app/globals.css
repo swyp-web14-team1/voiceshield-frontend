@@ -25,7 +25,7 @@
   --color-gray-900: #212529;
 
 
-  --text-xs: clamp(11px, 2.4cqw, 12px);
+  --text-xs: clamp(12px, 2.4cqw, 12px);
   --text-sm: clamp(13px, 2.8cqw, 14px);
   --text-base: clamp(13px, 3.2cqw, 16px);
   --text-xl: clamp(15px, 4cqw, 20px);
@@ -51,8 +51,21 @@ body {
   font-family: var(--font-pretendard), Arial, Helvetica, sans-serif;
 }
 
+button {
+  cursor: pointer;
+}
+
 
 @layer components {
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .card {
     border-radius: 20px;
     padding: 20px;

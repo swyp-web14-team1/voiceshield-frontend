@@ -7,6 +7,8 @@ export const ROUTES = {
 
   home: "/home", // US-02 메인 화면
 
+  learn: "/learn", // US-03 학습하기
+
   settings: "/settings", // US-10 설정
   settingsAccount: "/settings/account", // US-10 회원탈퇴
 } as const;

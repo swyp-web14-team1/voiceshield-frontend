@@ -52,7 +52,7 @@ export default function RootLayout({
       className={`${pretendard.variable} h-full antialiased`}
     >
       <body className="@container h-full">
-        <div className="mx-auto flex h-dvh w-full max-w-125 flex-col overflow-y-auto @max-[400px]:overflow-hidden bg-surface">
+        <div className="no-scrollbar mx-auto flex h-dvh w-full max-w-125 flex-col overflow-y-auto @max-[400px]:overflow-hidden bg-surface">
           {children}
         </div>
       </body>

@@ -11,23 +11,25 @@ export const CASE_CATEGORY_LABEL: Record<CaseCategory, string> = {
 export const MOCK_CASES: PhishingCase[] = [
   {
     id: "institution-01",
-    title: "검찰청을 사칭한 계좌 확인 전화",
+    title: "건강보험공단 환급금 사기 전화",
     category: "institution",
     difficulty: "medium",
     summary: "수사기관을 사칭해 개인정보와 금융정보를 요구하는 상황을 체험합니다.",
-    estimatedMinutes: 8,
-    completionRate: 0,
+    estimatedMinutes: 10,
+    completionRate: 60,
     isCompleted: false,
+    recommendation: 3,
   },
   {
     id: "family-01",
-    title: "자녀 납치를 가장한 긴급 송금 요청",
+    title: "아들 납치 협박 보이스피싱",
     category: "family",
-    difficulty: "hard",
+    difficulty: "easy",
     summary: "자녀의 사고를 빙자해 긴박한 상황을 연출, 송금을 유도하는 상황을 체험합니다.",
     estimatedMinutes: 10,
-    completionRate: 0,
-    isCompleted: false,
+    completionRate: 100,
+    isCompleted: true,
+    recommendation: 5,
   },
   {
     id: "delivery-01",
@@ -38,6 +40,7 @@ export const MOCK_CASES: PhishingCase[] = [
     estimatedMinutes: 5,
     completionRate: 0,
     isCompleted: false,
+    recommendation: 4,
   },
   {
     id: "messenger-01",
@@ -48,6 +51,7 @@ export const MOCK_CASES: PhishingCase[] = [
     estimatedMinutes: 7,
     completionRate: 0,
     isCompleted: false,
+    recommendation: 4,
   },
   {
     id: "investment-01",
@@ -58,6 +62,7 @@ export const MOCK_CASES: PhishingCase[] = [
     estimatedMinutes: 9,
     completionRate: 0,
     isCompleted: false,
+    recommendation: 5,
   },
 ];
 

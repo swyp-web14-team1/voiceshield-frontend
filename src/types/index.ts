@@ -20,6 +20,7 @@ export interface PhishingCase {
   estimatedMinutes: number;
   completionRate: number; // 0~100
   isCompleted: boolean;
+  recommendation: number; // 0~5 (별점)
 }
 
 export interface QuizQuestion {

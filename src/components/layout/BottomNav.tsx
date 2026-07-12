@@ -3,20 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ROUTES } from "@/lib/routes";
-import {
-  NavEmergencyIcon,
-  NavHistoryIcon,
-  NavHomeIcon,
-  NavLearnIcon,
-  NavSettingsIcon,
-} from "@/components/icons/home-icons";
+import { RiHomeSmileLine } from "react-icons/ri";
+import { FiBookOpen } from "react-icons/fi";
+import { VscGraph, VscSettingsCompact } from "react-icons/vsc";
+import { NavEmergencyIcon } from "@/components/icons/home-icons";
 
 const NAV_ITEMS = [
-  { label: "홈", href: ROUTES.home, Icon: NavHomeIcon, placeholder: false },
-  { label: "학습", href: ROUTES.home, Icon: NavLearnIcon, placeholder: true },
-  { label: "기록", href: ROUTES.home, Icon: NavHistoryIcon, placeholder: true },
+  { label: "홈", href: ROUTES.home, Icon: RiHomeSmileLine, placeholder: false },
+  { label: "학습", href: ROUTES.learn, Icon: FiBookOpen, placeholder: false },
+  { label: "기록", href: ROUTES.home, Icon: VscGraph, placeholder: true },
   { label: "긴급", href: ROUTES.home, Icon: NavEmergencyIcon, placeholder: true },
-  { label: "설정", href: ROUTES.settings, Icon: NavSettingsIcon, placeholder: false },
+  { label: "설정", href: ROUTES.settings, Icon: VscSettingsCompact, placeholder: false },
 ];
 
 export function BottomNav() {
@@ -44,7 +41,7 @@ export function BottomNav() {
                   className="shrink-0"
                   style={{ width: "clamp(14px, 4.4cqw, 22px)", height: "clamp(14px, 4.4cqw, 22px)" }}
                 />
-                <span className="w-full truncate text-center text-xs font-bold">{label}</span>
+                <span className="w-full truncate text-center text-xs font-medium">{label}</span>
               </Link>
             </li>
           );
