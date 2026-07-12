@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #f5f5f5;
   --foreground: #171717;
+  --surface: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --font-sans: var(--font-pretendard);
+}
+
+@theme {
+  --color-gray-100: #f8f9fa;
+  --color-gray-200: #e9ecef;
+  --color-gray-300: #dee2e6;
+  --color-gray-400: #ced4da;
+  --color-gray-500: #adb5bd;
+  --color-gray-600: #6c757d;
+  --color-gray-700: #495057;
+  --color-gray-800: #343a40;
+  --color-gray-900: #212529;
+
+
+  --text-xs: clamp(11px, 2.4cqw, 12px);
+  --text-sm: clamp(13px, 2.8cqw, 14px);
+  --text-base: clamp(13px, 3.2cqw, 16px);
+  --text-xl: clamp(15px, 4cqw, 20px);
+  --text-3xl: clamp(13px, 6cqw, 30px);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #18181b;
   }
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-pretendard), Arial, Helvetica, sans-serif;
+}
+
+
+@layer components {
+  .card {
+    border-radius: 20px;
+    padding: 20px;
+  }
+
+  .btn {
+    display: flex;
+    width: 100%;
+    height: 52px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    font-size: 16px;
+    font-weight: 600;
+  }
 }

@@ -3,38 +3,48 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ROUTES } from "@/lib/routes";
+import {
+  NavEmergencyIcon,
+  NavHistoryIcon,
+  NavHomeIcon,
+  NavLearnIcon,
+  NavSettingsIcon,
+} from "@/components/icons/home-icons";
 
 const NAV_ITEMS = [
-  { label: "홈", href: ROUTES.home },
-  { label: "사례", href: ROUTES.cases },
-  { label: "기록", href: ROUTES.history },
-  { label: "신고안내", href: ROUTES.report },
-  { label: "설정", href: ROUTES.settings },
+  { label: "홈", href: ROUTES.home, Icon: NavHomeIcon, placeholder: false },
+  { label: "학습", href: ROUTES.home, Icon: NavLearnIcon, placeholder: true },
+  { label: "기록", href: ROUTES.home, Icon: NavHistoryIcon, placeholder: true },
+  { label: "긴급", href: ROUTES.home, Icon: NavEmergencyIcon, placeholder: true },
+  { label: "설정", href: ROUTES.settings, Icon: NavSettingsIcon, placeholder: false },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky bottom-0 border-t border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-black/95">
-      <ul className="mx-auto flex max-w-xl items-stretch justify-between px-2">
-        {NAV_ITEMS.map((item) => {
+    <nav className="sticky bottom-0 h-16.75 border-t border-gray-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-black/95">
+      <ul
+        className="mx-auto flex h-full w-full max-w-xl items-center justify-center overflow-hidden px-10 @max-[410px]:px-7"
+        style={{ gap: "clamp(4px, 6cqw, 40px)" }}
+      >
+        {NAV_ITEMS.map(({ label, href, Icon, placeholder }, index) => {
           const isActive =
-            item.href === ROUTES.home
-              ? pathname === item.href
-              : pathname.startsWith(item.href);
+            !placeholder && (href === ROUTES.home ? pathname === href : pathname.startsWith(href));
 
           return (
-            <li key={item.href} className="flex-1">
+            <li key={index} className="min-w-0 flex-1">
               <Link
-                href={item.href}
-                className={`flex flex-col items-center gap-1 py-3 text-sm font-medium ${
-                  isActive
-                    ? "text-blue-600 dark:text-blue-400"
-                    : "text-zinc-500 dark:text-zinc-400"
+                href={href}
+                className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl py-1 ${
+                  isActive ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"
                 }`}
               >
-                {item.label}
+                <Icon
+                  className="shrink-0"
+                  style={{ width: "clamp(14px, 4.4cqw, 22px)", height: "clamp(14px, 4.4cqw, 22px)" }}
+                />
+                <span className="w-full truncate text-center text-xs font-bold">{label}</span>
               </Link>
             </li>
           );

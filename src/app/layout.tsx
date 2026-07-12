@@ -1,15 +1,31 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const pretendard = localFont({
+  variable: "--font-pretendard",
+  src: [
+    {
+      path: "../../node_modules/pretendard/dist/web/static/woff2/Pretendard-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../node_modules/pretendard/dist/web/static/woff2/Pretendard-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../node_modules/pretendard/dist/web/static/woff2/Pretendard-SemiBold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../../node_modules/pretendard/dist/web/static/woff2/Pretendard-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
 });
 
 export const metadata: Metadata = {
@@ -33,9 +49,13 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${pretendard.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="@container h-full">
+        <div className="mx-auto flex h-dvh w-full max-w-125 flex-col overflow-y-auto @max-[400px]:overflow-hidden bg-surface">
+          {children}
+        </div>
+      </body>
     </html>
   );
 }
