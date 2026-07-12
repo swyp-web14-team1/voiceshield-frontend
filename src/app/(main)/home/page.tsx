@@ -86,8 +86,8 @@ export default function HomePage() {
               <div
                 className="absolute inset-0 rounded-[10px] pointer-events-none -z-10"
                 style={{
-                  padding: '0.8px',
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.4) 10%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.2) 65%, rgba(255,255,255,0.2) 80%, rgba(255,255,255,0.6) 120%)',
+                  padding: '0.7px',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.4) 22%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.2) 65%, rgba(255,255,255,0.2) 80%, rgba(255,255,255,0.4) 100%)',
                   WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                   WebkitMaskComposite: 'xor',
                   maskComposite: 'exclude',
