@@ -68,18 +68,34 @@ export default function HomePage() {
         <p className="text-base font-bold tracking-[0.3px] text-white uppercase">
           카테고리별 학습
         </p>
+        
         <div className="grid grid-cols-3 gap-3 cursor-pointer">
           {CATEGORY_TILES.map(({ label, Icon, bg, iconSize }) => (
             <div
               key={label}
-              className="relative flex flex-col items-center justify-center overflow-hidden rounded-[10px] bg-white/4 shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_20px_rgba(0,0,0,0.1),inset_1px_1px_0_0_rgba(255,255,255,0.6),inset_-0.8px_-0.8px_0_0_rgba(255,255,255,0.4),inset_-0px_0px_1px_0_rgba(0,0,0,0.4),inset_5px_-0px_6px_0_rgba(0,0,0,0.1)] backdrop-blur-md transition-colors duration-200 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-white/10"
+              className="group relative flex flex-col items-center justify-center overflow-hidden rounded-[10px]
+                        backdrop-blur-lg transition-all duration-300
+                        bg-white/[0.08] hover:bg-white/[0.15]
+                        shadow-[0_12px_24px_-4px_rgba(13,10,31,0.2),_inset_4px_4px_12px_rgba(0,0,0,0.1)]"
               style={{
                 padding: "clamp(8px, 3cqw, 22px)",
                 gap: "clamp(4px, 2cqw, 6px)",
               }}
             >
+
               <div
-                className="relative flex items-center justify-center"
+                className="absolute inset-0 rounded-[10px] pointer-events-none -z-10"
+                style={{
+                  padding: '0.7px',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.4) 22%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.2) 65%, rgba(255,255,255,0.2) 80%, rgba(255,255,255,0.4) 100%)',
+                  WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                }}
+              />
+              
+              <div
+                className="relative flex items-center justify-center "
                 style={{
                   backgroundColor: bg,
                   width: "clamp(28px, 8cqw, 40px)",
@@ -92,7 +108,8 @@ export default function HomePage() {
                   style={{ width: iconSize ?? DEFAULT_ICON_SIZE, height: iconSize ?? DEFAULT_ICON_SIZE }}
                 />
               </div>
-              <span className="relative text-xs font-medium text-white">{label}</span>
+              
+              <span className="relative text-xs font-medium text-white tracking-wide">{label}</span>
             </div>
           ))}
         </div>

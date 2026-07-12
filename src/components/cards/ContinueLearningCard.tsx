@@ -68,8 +68,8 @@ export function ContinueLearningCard({
           <div
             className={
               isLight
-                ? "mt-1 h-2 w-74.75 overflow-hidden rounded-full bg-[rgba(138,155,188,0.21)]"
-                : "mt-1 h-2 w-74.75 overflow-hidden rounded-full bg-white/20"
+                ? "mt-1 h-2 w-11/12 max-w-80 overflow-hidden rounded-full bg-[rgba(138,155,188,0.21)]"
+                : "mt-1 h-2 w-11/12 max-w-80 overflow-hidden rounded-full bg-white/20"
             }
           >
             <div
