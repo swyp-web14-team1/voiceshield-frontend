@@ -87,7 +87,7 @@ export default function LoginPage() {
           </Link>
         </div>
         <p
-          className="px-4 text-center text-[0.625rem] leading-relaxed text-gray-400 dark:text-gray-700"
+          className="px-4 text-center text-[0.625rem] leading-relaxed text-gray-500 dark:text-gray-700"
           style={{ marginTop: "clamp(14px, 5.8cqw, 29px)" }}
         >
           로그인하면 이용약관 및 개인정보 처리방침에
