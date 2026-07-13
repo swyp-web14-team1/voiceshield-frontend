@@ -11,6 +11,11 @@ export type CaseDifficulty = "easy" | "medium" | "hard";
 
 export type SimulationMode = "voice" | "message";
 
+export interface PhishingDialogueLine {
+  speaker: "caller" | "user";
+  text: string;
+}
+
 export interface PhishingCase {
   id: string;
   title: string;
@@ -21,6 +26,9 @@ export interface PhishingCase {
   completionRate: number; // 0~100
   isCompleted: boolean;
   recommendation: number; // 0~5 (별점)
+  realCaseExample: string;
+  exampleMessage: string;
+  phoneDialogue: PhishingDialogueLine[];
 }
 
 export interface QuizQuestion {

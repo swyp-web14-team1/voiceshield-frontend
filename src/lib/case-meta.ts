@@ -8,7 +8,7 @@ import {
 } from "@/components/icons/home-icons";
 
 export const CATEGORY_META: Record<CaseCategory, { label: string; Icon: React.ElementType; bg: string }> = {
-  institution: { label: "기관사칭", Icon: CategoryGovernmentIcon, bg: "#2b7fff" },
+  institution: { label: "기관사칭", Icon: CategoryGovernmentIcon, bg: "rgba(138,155,188,0.44)" },
   family: { label: "가족사기", Icon: CategoryFamilyIcon, bg: "#ff2056" },
   delivery: { label: "택배사기", Icon: CategoryDeliveryIcon, bg: "#fe9a00" },
   investment: { label: "투자사기", Icon: AiOutlineStock, bg: "#00bc7d" },

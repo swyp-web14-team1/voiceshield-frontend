@@ -41,7 +41,7 @@ export function CategoryTagRow({ value, onChange }: CategoryTagRowProps) {
   return (
     <div
       ref={tagRowRef}
-      className="no-scrollbar -my-1 flex cursor-grab gap-2.5 overflow-x-auto py-1 active:cursor-grabbing"
+      className="no-scrollbar -my-1 flex cursor-pointer gap-2.5 overflow-x-auto py-1"
       style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -63,7 +63,7 @@ export function CategoryTagRow({ value, onChange }: CategoryTagRowProps) {
           key={key}
           type="button"
           onClick={() => onChange(key)}
-          className={`shrink-0 rounded-full px-4 py-1 text-sm font-bold whitespace-nowrap ${
+          className={`shrink-0 rounded-full px-4 py-1 text-sm font-semibold whitespace-nowrap ${
             value === key ? "bg-gray-600 text-white" : "bg-white text-gray-600 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
           }`}
         >

@@ -28,7 +28,7 @@ export function ContinueLearningCard({
     return (
       <Link
         href={href}
-        className="flex items-center gap-3 rounded-xl px-3 py-2.5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
+        className="flex items-center gap-3 rounded-xl px-3 py-2.5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] transition-shadow [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),inset_0_0_0_999px_rgba(0,0,0,0.12)]"
         style={{
           backgroundImage:
             "linear-gradient(90deg, #1e40af 0%, #1f42b3 7%, #1f45b7 14%, #2047bc 21%, #204ac0 29%, #214cc4 36%, #214fc8 43%, #2251cd 50%, #2254d1 57%, #2356d5 64%, #2359da 71%, #235cde 79%, #245ee2 86%, #2461e6 93%, #2563eb 100%)",
@@ -41,7 +41,7 @@ export function ContinueLearningCard({
           <span className="text-xs text-white/70">{heading}</span>
           <span className="truncate text-[0.8125rem] font-semibold text-white">{phishingCase.title}</span>
         </div>
-        <span className="shrink-0 rounded-[8px] bg-white px-3 py-1.5 text-xs font-bold text-blue-600">이어하기</span>
+        <span className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-blue-600">이어하기</span>
       </Link>
     );
   }

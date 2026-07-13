@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { label: "홈", href: ROUTES.home, Icon: RiHomeSmileLine, placeholder: false },
   { label: "학습", href: ROUTES.learn, Icon: FiBookOpen, placeholder: false },
   { label: "기록", href: ROUTES.home, Icon: VscGraph, placeholder: true },
-  { label: "긴급", href: ROUTES.home, Icon: NavEmergencyIcon, placeholder: true },
+  { label: "긴급", href: ROUTES.emergency, Icon: NavEmergencyIcon, placeholder: false },
   { label: "설정", href: ROUTES.settings, Icon: VscSettingsCompact, placeholder: false },
 ];
 

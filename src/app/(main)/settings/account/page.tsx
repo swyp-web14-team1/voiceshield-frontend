@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 
-// US-10-05 회원탈퇴 (탈퇴 안내 → 탈퇴 사유 입력 → 탈퇴 완료)
+
 export default function AccountDeletionPage() {
   return (
     <div className="flex flex-1 flex-col">

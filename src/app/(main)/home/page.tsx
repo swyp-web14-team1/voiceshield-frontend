@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FiBookOpen } from "react-icons/fi";
 import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
 import { AiOutlineStock } from "react-icons/ai";
@@ -11,15 +12,22 @@ import { DIFFICULTY_META } from "@/lib/case-meta";
 import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
 import { RecommendedCard } from "@/components/cards/RecommendedCard";
 import { ROUTES } from "@/lib/routes";
+import type { CaseCategory } from "@/types";
 
 const DEFAULT_ICON_SIZE = "clamp(14px, 4cqw, 20px)";
 
-const CATEGORY_TILES = [
-  { label: "기관사칭", Icon: CategoryGovernmentIcon, bg: "#2b7fff" },
-  { label: "가족사기", Icon: CategoryFamilyIcon, bg: "#ff2056" },
-  { label: "택배사기", Icon: CategoryDeliveryIcon, bg: "#fe9a00" },
-  { label: "투자사기", Icon: AiOutlineStock, bg: "#00bc7d", iconSize: "clamp(17px, 4.8cqw, 24px)" },
-  { label: "메신저사기", Icon: CategoryMessengerIcon, bg: "#8e51ff" },
+const CATEGORY_TILES: {
+  label: string;
+  category: CaseCategory;
+  Icon: React.ElementType;
+  bg: string;
+  iconSize?: string;
+}[] = [
+  { label: "기관사칭", category: "institution", Icon: CategoryGovernmentIcon, bg: "rgba(138,155,188,0.44)" },
+  { label: "가족사기", category: "family", Icon: CategoryFamilyIcon, bg: "#ff2056" },
+  { label: "택배사기", category: "delivery", Icon: CategoryDeliveryIcon, bg: "#fe9a00" },
+  { label: "투자사기", category: "investment", Icon: AiOutlineStock, bg: "#00bc7d", iconSize: "clamp(17px, 4.8cqw, 24px)" },
+  { label: "메신저사기", category: "messenger", Icon: CategoryMessengerIcon, bg: "#8e51ff" },
 ];
 
 const RECOMMENDED_CASES = [...MOCK_CASES].sort((a, b) => b.recommendation - a.recommendation).slice(0, 2);
@@ -29,7 +37,7 @@ export default function HomePage() {
   const continueCase = getCaseById("institution-01")!;
 
   return (
-    <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3.5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">
+    <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4 @max-[410px]:gap-3.5">
       <section className="flex flex-col gap-1 rounded-xl bg-white p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
         <p className="text-xs font-medium text-[#64748B]">피싱안전지킴이</p>
         <h1 className="text-xl font-bold text-[#1a2332]">
@@ -58,7 +66,7 @@ export default function HomePage() {
 
       <ContinueLearningCard
         heading="이어서 학습하기"
-        href={ROUTES.home}
+        href={ROUTES.scenario(continueCase.id)}
         phishingCase={continueCase}
         difficultyLabel={DIFFICULTY_META[continueCase.difficulty].label}
         difficultyColor={DIFFICULTY_META[continueCase.difficulty].bg}
@@ -74,8 +82,9 @@ export default function HomePage() {
         </p>
         
         <div className="grid grid-cols-3 gap-3 cursor-pointer">
-          {CATEGORY_TILES.map(({ label, Icon, bg, iconSize }) => (
-            <div
+          {CATEGORY_TILES.map(({ label, category, Icon, bg, iconSize }) => (
+            <Link
+              href={`${ROUTES.learn}?category=${category}`}
               key={label}
               className="group relative flex flex-col items-center justify-center overflow-hidden rounded-[10px]
                         backdrop-blur-lg transition-all duration-300
@@ -114,7 +123,7 @@ export default function HomePage() {
               </div>
               
               <span className="relative text-xs font-medium text-white tracking-wide">{label}</span>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
@@ -126,7 +135,7 @@ export default function HomePage() {
         </p>
         <div className="mt-3 flex flex-col gap-2.25">
           {RECOMMENDED_CASES.map((c) => (
-            <RecommendedCard key={c.id} href={ROUTES.home} phishingCase={c} />
+            <RecommendedCard key={c.id} href={ROUTES.scenario(c.id)} phishingCase={c} />
           ))}
         </div>
       </section>
