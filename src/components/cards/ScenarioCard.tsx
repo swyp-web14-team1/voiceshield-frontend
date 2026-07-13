@@ -71,7 +71,8 @@ export function ScenarioCard({ phishingCase }: { phishingCase: PhishingCase }) {
 
         <button
           type="button"
-          className="rounded-[10px] bg-gradient-to-r from-blue-400 to-blue-600 py-2.5 text-center text-[13px] font-bold text-white shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
+          className="rounded-[10px] py-2.5 text-center text-[13px] font-semibold text-white shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
+          style={{ backgroundImage: "linear-gradient(90deg, #60a5fa 0%, #2849be 100%)" }}
         >
           {phishingCase.isCompleted
             ? "다시 학습하기"

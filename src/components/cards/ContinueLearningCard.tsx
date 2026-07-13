@@ -9,7 +9,7 @@ interface ContinueLearningCardProps {
   phishingCase: PhishingCase;
   difficultyLabel: string;
   difficultyColor: string;
-  variant?: "light" | "gradient";
+  variant?: "light" | "gradient" | "compact";
 }
 
 export function ContinueLearningCard({
@@ -23,6 +23,28 @@ export function ContinueLearningCard({
   const isLight = variant === "light";
   const category = CATEGORY_META[phishingCase.category];
   const CategoryIcon = category.Icon;
+
+  if (variant === "compact") {
+    return (
+      <Link
+        href={href}
+        className="flex items-center gap-3 rounded-xl px-3 py-2.5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
+        style={{
+          backgroundImage:
+            "linear-gradient(90deg, #1e40af 0%, #1f42b3 7%, #1f45b7 14%, #2047bc 21%, #204ac0 29%, #214cc4 36%, #214fc8 43%, #2251cd 50%, #2254d1 57%, #2356d5 64%, #2359da 71%, #235cde 79%, #245ee2 86%, #2461e6 93%, #2563eb 100%)",
+        }}
+      >
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-white/20">
+          <CategoryIcon className="size-4.5 text-white" />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="text-xs text-white/70">{heading}</span>
+          <span className="truncate text-[0.8125rem] font-semibold text-white">{phishingCase.title}</span>
+        </div>
+        <span className="shrink-0 rounded-[8px] bg-white px-3 py-1.5 text-xs font-bold text-blue-600">이어하기</span>
+      </Link>
+    );
+  }
 
   return (
     <Link
@@ -56,7 +78,7 @@ export function ContinueLearningCard({
           </p>
           <div className="flex items-center gap-2">
             <span
-              className="rounded-full px-2 py-0.5 text-xs font-bold text-white"
+              className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
               style={{ backgroundColor: difficultyColor }}
             >
               {difficultyLabel}

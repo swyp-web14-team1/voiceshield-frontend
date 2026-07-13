@@ -1,4 +1,5 @@
-import { getCaseById } from "@/lib/mock-cases";
+import { FiBookOpen } from "react-icons/fi";
+import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
 import { AiOutlineStock } from "react-icons/ai";
 import {
   CategoryDeliveryIcon,
@@ -8,6 +9,7 @@ import {
 } from "@/components/icons/home-icons";
 import { DIFFICULTY_META } from "@/lib/case-meta";
 import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
+import { RecommendedCard } from "@/components/cards/RecommendedCard";
 import { ROUTES } from "@/lib/routes";
 
 const DEFAULT_ICON_SIZE = "clamp(14px, 4cqw, 20px)";
@@ -20,18 +22,20 @@ const CATEGORY_TILES = [
   { label: "메신저사기", Icon: CategoryMessengerIcon, bg: "#8e51ff" },
 ];
 
+const RECOMMENDED_CASES = [...MOCK_CASES].sort((a, b) => b.recommendation - a.recommendation).slice(0, 2);
+
 
 export default function HomePage() {
   const continueCase = getCaseById("institution-01")!;
 
   return (
-    <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-6 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none @max-[410px]:gap-3 overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">
+    <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3.5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">
       <section className="flex flex-col gap-1 rounded-xl bg-white p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
         <p className="text-xs font-medium text-[#64748B]">피싱안전지킴이</p>
         <h1 className="text-xl font-bold text-[#1a2332]">
           안녕하세요, <span className="text-blue-600">홍길동</span> 님!
         </h1>
-        <p className="mt-1 text-sm text-slate-500">오늘의 학습 진도율</p>
+        <p className="mt-2.25 text-sm text-slate-500">오늘의 학습 진도율</p>
         <div className="mt-0.5 h-2 w-full overflow-hidden rounded-full bg-[#e6eaf0]">
           <div className="h-2 w-[68%] rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
         </div>
@@ -111,6 +115,18 @@ export default function HomePage() {
               
               <span className="relative text-xs font-medium text-white tracking-wide">{label}</span>
             </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col">
+        <p className="flex items-center gap-1.5 text-base font-bold text-[#1A2035]">
+          <FiBookOpen size={18} className="text-gray-600" />
+          오늘의 추천학습
+        </p>
+        <div className="mt-3 flex flex-col gap-2.25">
+          {RECOMMENDED_CASES.map((c) => (
+            <RecommendedCard key={c.id} href={ROUTES.home} phishingCase={c} />
           ))}
         </div>
       </section>
