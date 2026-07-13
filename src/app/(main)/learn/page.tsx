@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FiSearch } from "react-icons/fi";
 import { ROUTES } from "@/lib/routes";
@@ -17,6 +17,14 @@ function isCaseCategory(value: string | null): value is CaseCategory {
 }
 
 export default function LearnPage() {
+  return (
+    <Suspense fallback={null}>
+      <LearnPageContent />
+    </Suspense>
+  );
+}
+
+function LearnPageContent() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category");
   const [category, setCategory] = useState<"all" | CaseCategory>(
