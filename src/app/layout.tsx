@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { FontScaleProvider } from "@/components/providers/FontScaleProvider";
 
 const pretendard = localFont({
   variable: "--font-pretendard",
@@ -50,11 +51,21 @@ export default function RootLayout({
     <html
       lang="ko"
       className={`${pretendard.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s={"보통":1,"크게":${14 / 12},"아주크게":${16 / 12}};var v=localStorage.getItem("voiceshield-font-size");document.documentElement.style.setProperty("--font-scale",String(s[v]||1));}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="@container h-full">
-        <div className="no-scrollbar mx-auto flex h-dvh w-full max-w-125 flex-col overflow-y-auto @max-[400px]:overflow-hidden bg-surface">
-          {children}
-        </div>
+        <FontScaleProvider>
+          <div className="no-scrollbar mx-auto flex h-dvh w-full max-w-125 flex-col overflow-y-auto @max-[400px]:overflow-hidden bg-surface">
+            {children}
+          </div>
+        </FontScaleProvider>
       </body>
     </html>
   );

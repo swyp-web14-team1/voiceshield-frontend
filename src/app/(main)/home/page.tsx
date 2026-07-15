@@ -37,7 +37,7 @@ export default function HomePage() {
   const continueCase = getCaseById("institution-01")!;
 
   return (
-    <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4 @max-[410px]:gap-3.5">
+    <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3.5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">
       <section className="flex flex-col gap-1 rounded-xl bg-white p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
         <p className="text-xs font-medium text-[#64748B]">피싱안전지킴이</p>
         <h1 className="text-xl font-bold text-[#1a2332]">
@@ -128,7 +128,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="flex flex-col">
+      <section className="flex flex-col pt-1">
         <p className="flex items-center gap-1.5 text-base font-bold text-[#1A2035]">
           <FiBookOpen size={18} className="text-gray-600" />
           오늘의 추천학습

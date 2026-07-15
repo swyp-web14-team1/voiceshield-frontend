@@ -4,6 +4,7 @@
   --background: #f5f5f5;
   --foreground: #171717;
   --surface: #ffffff;
+  --font-scale: 1;
 }
 
 @theme inline {
@@ -25,11 +26,11 @@
   --color-gray-900: #212529;
 
 
-  --text-xs: clamp(12px, 2.4cqw, 12px);
-  --text-sm: clamp(13px, 2.8cqw, 14px);
-  --text-base: clamp(13px, 3.2cqw, 16px);
-  --text-xl: clamp(15px, 4cqw, 20px);
-  --text-3xl: clamp(13px, 6cqw, 30px);
+  --text-xs: calc(var(--font-scale, 1) * clamp(12px, 2.4cqw, 12px));
+  --text-sm: calc(var(--font-scale, 1) * clamp(13px, 2.8cqw, 14px));
+  --text-base: calc(var(--font-scale, 1) * clamp(13px, 3.2cqw, 16px));
+  --text-xl: calc(var(--font-scale, 1) * clamp(15px, 4cqw, 20px));
+  --text-3xl: calc(var(--font-scale, 1) * clamp(13px, 6cqw, 30px));
 }
 
 @media (prefers-color-scheme: dark) {

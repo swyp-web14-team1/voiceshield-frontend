@@ -44,7 +44,7 @@ function LearnPageContent() {
       <div className="shrink-0">
         <BackHeader title="학습하기" backHref={ROUTES.home} />
 
-        <div className="flex flex-col gap-4 px-4 pb-6">
+        <div className="flex flex-col gap-3.5 px-4 pb-6">
           <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] mt-2">
             <FiSearch className="shrink-0 text-gray-500" size={16} />
             <input
@@ -59,7 +59,7 @@ function LearnPageContent() {
         </div>
       </div>
 
-      <div className="no-scrollbar flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-6">
+      <div className="no-scrollbar flex flex-1 flex-col gap-3.5 overflow-y-auto px-4 pb-6">
         <ContinueLearningCard
           heading="최근 학습한 사례"
           href={ROUTES.scenario(continueCase.id)}
