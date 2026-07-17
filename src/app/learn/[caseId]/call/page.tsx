@@ -1,10 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BsFillPersonFill } from "react-icons/bs";
 import { ROUTES } from "@/lib/routes";
+import { getCaseById } from "@/lib/mock-cases";
+import { getStoredTtsPreference, prefetchTts } from "@/lib/tts";
 
 const ACTION_BUTTON_SIZE = "clamp(56px, 18cqw, 75px)";
 const ACTION_ICON_SIZE = "clamp(22px, 6cqw, 30px)";
@@ -13,6 +15,15 @@ const CALL_END_ICON_WIDTH = "clamp(27px, 8cqw, 37px)";
 export default function IncomingCallPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
   const router = useRouter();
+
+  // 통화 진행 화면으로 넘어가자마자 첫 대사가 바로 들리도록, 벨이 울리는 동안 미리 TTS를 요청해둔다.
+  useEffect(() => {
+    const phishingCase = getCaseById(caseId);
+    const firstLine = phishingCase?.phoneDialogue.find((line) => line.speaker === "caller");
+    if (!firstLine) return;
+    const { voice, rate } = getStoredTtsPreference();
+    prefetchTts(firstLine.text, voice, rate).catch(() => {});
+  }, [caseId]);
 
   return (
     <div
@@ -65,7 +76,7 @@ export default function IncomingCallPage({ params }: { params: Promise<{ caseId:
 
         <button
           type="button"
-          onClick={() => router.push(ROUTES.scenario(caseId))}
+          onClick={() => router.push(ROUTES.callProgress(caseId))}
           className="flex flex-col items-center"
           style={{ gap: "clamp(10px, 3cqh, 16px)" }}
         >

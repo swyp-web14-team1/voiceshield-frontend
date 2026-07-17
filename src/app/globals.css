@@ -94,6 +94,15 @@ button {
   .call-ring-pulse {
     animation: call-ring 2.1s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
   }
+
+  .call-waveform-bar {
+    animation: call-waveform-bar 1s ease-in-out infinite;
+    transform-origin: center;
+  }
+
+  .bubble-enter {
+    animation: bubble-enter 0.35s ease-out;
+  }
 }
 
 @keyframes call-ring {
@@ -106,3 +115,25 @@ button {
     opacity: 0;
   }
 }
+
+@keyframes call-waveform-bar {
+  0%,
+  100% {
+    transform: scaleY(0.85);
+  }
+  50% {
+    transform: scaleY(1.12);
+  }
+}
+
+@keyframes bubble-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

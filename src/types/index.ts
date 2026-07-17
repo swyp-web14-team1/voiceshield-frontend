@@ -16,6 +16,14 @@ export interface PhishingDialogueLine {
   text: string;
 }
 
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  choices: string[];
+  answerIndex: number;
+  explanation: string;
+}
+
 export interface PhishingCase {
   id: string;
   title: string;
@@ -29,14 +37,8 @@ export interface PhishingCase {
   realCaseExample: string;
   exampleMessage: string;
   phoneDialogue: PhishingDialogueLine[];
-}
-
-export interface QuizQuestion {
-  id: string;
-  question: string;
-  choices: string[];
-  answerIndex: number;
-  explanation: string;
+  callerLabel: string; // 전화 시뮬레이션에서 발신자로 표시할 이름 (예: "시청 주무관 사칭범")
+  quiz: QuizQuestion[]; // 전화 시뮬레이션 중간에 등장하는 판단 퀴즈
 }
 
 export interface LearningProgress {

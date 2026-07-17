@@ -7,6 +7,7 @@ import { FiChevronDown, FiChevronUp, FiX } from "react-icons/fi";
 import { IoVolumeMedium, IoVolumeMediumOutline } from "react-icons/io5";
 import { ROUTES } from "@/lib/routes";
 import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { TTS_SPEEDS, TTS_VOICES, TTS_VOICE_STORAGE_KEY, TTS_SPEED_STORAGE_KEY } from "@/lib/tts";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { ChatBubbleIcon, ArrowIcon } from "@/components/icons/kakao-icons";
 import { FONT_SIZES, useFontScale } from "@/components/providers/FontScaleProvider";
@@ -19,8 +20,6 @@ const FONT_SIZE_TEXT_CLASS: Record<(typeof FONT_SIZES)[number], string> = {
 const REMINDER_STORAGE_KEY = "voiceshield-reminder-on";
 const REMINDER_HOUR_STORAGE_KEY = "voiceshield-reminder-hour";
 const REMINDER_MINUTE_STORAGE_KEY = "voiceshield-reminder-minute";
-const TTS_SPEEDS = ["X 0.5", "X 1.0", "X 1.5", "X 2.0"] as const;
-const TTS_VOICES = ["V1", "V2", "V3", "V4"] as const;
 const PREVIEW_TEXT = "안녕하세요, 보이스쉴드입니다. 피싱 예방 교육을 시작할게요.";
 
 
@@ -111,6 +110,13 @@ export default function SettingsPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
     if (localStorage.getItem(REMINDER_STORAGE_KEY) === "true") {
       setReminderOn(true);
     }
@@ -122,7 +128,26 @@ export default function SettingsPage() {
     if (localStorage.getItem(AUTH_STORAGE_KEY) === "true") {
       setIsLoggedIn(true);
     }
+
+    const storedSpeed = localStorage.getItem(TTS_SPEED_STORAGE_KEY);
+    if (storedSpeed && (TTS_SPEEDS as readonly string[]).includes(storedSpeed)) {
+      setTtsSpeed(storedSpeed as (typeof TTS_SPEEDS)[number]);
+    }
+    const storedVoice = localStorage.getItem(TTS_VOICE_STORAGE_KEY);
+    if (storedVoice && (TTS_VOICES as readonly string[]).includes(storedVoice)) {
+      setTtsVoice(storedVoice as (typeof TTS_VOICES)[number]);
+    }
   }, []);
+
+  const changeTtsSpeed = (speed: (typeof TTS_SPEEDS)[number]) => {
+    setTtsSpeed(speed);
+    localStorage.setItem(TTS_SPEED_STORAGE_KEY, speed);
+  };
+
+  const changeTtsVoice = (voice: (typeof TTS_VOICES)[number]) => {
+    setTtsVoice(voice);
+    localStorage.setItem(TTS_VOICE_STORAGE_KEY, voice);
+  };
 
   const changeHour = (delta: number) => {
     setHour((h) => {
@@ -266,7 +291,7 @@ export default function SettingsPage() {
           <hr className="border-gray-200" />
           <div className="flex items-center justify-center gap-2.5">
             {TTS_SPEEDS.map((speed) => (
-              <PillButton key={speed} label={speed} selected={ttsSpeed === speed} onClick={() => setTtsSpeed(speed)} />
+              <PillButton key={speed} label={speed} selected={ttsSpeed === speed} onClick={() => changeTtsSpeed(speed)} />
             ))}
           </div>
         </SettingsCard>
@@ -286,7 +311,7 @@ export default function SettingsPage() {
                     label={voice}
                     selected={selected}
                     onClick={() => {
-                      setTtsVoice(voice);
+                      changeTtsVoice(voice);
                       handlePlayVoice(voice);
                     }}
                   />
@@ -295,7 +320,7 @@ export default function SettingsPage() {
                     aria-label={`${voice} 미리듣기`}
                     aria-pressed={playing}
                     onClick={() => {
-                      setTtsVoice(voice);
+                      changeTtsVoice(voice);
                       handlePlayVoice(voice);
                     }}
                     className={`flex items-center justify-center rounded-full border px-3 py-0.25 transition-colors ${
