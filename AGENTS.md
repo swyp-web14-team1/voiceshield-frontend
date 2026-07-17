@@ -35,7 +35,8 @@ src/
         [caseId]/page.tsx    # US-03 학습 시나리오 상세
       emergency/page.tsx     # US-09 긴급 신고 안내
       settings/
-        page.tsx             # US-10 설정 (회원 탈퇴는 별도 라우트가 아니라 이 페이지 내 모달로 구현됨)
+        page.tsx             # US-10 설정
+        account/page.tsx     # US-10 회원 탈퇴 (탈퇴 사유 → 완료 확인 모달)
   components/
     layout/                  # BackHeader(모든 하위 페이지 공통 뒤로가기 헤더), BottomNav
     cards/                   # ScenarioCard, ContinueLearningCard, RecommendedCard, CaseStatsGrid
@@ -65,6 +66,7 @@ public/
 - 텍스트 크기는 `globals.css`의 `--text-*`(xs/sm/base/xl/3xl) 토큰을 사용한다 — 전부 `calc(var(--font-scale, 1) * clamp(...))`로 감싸져 있어 설정 페이지의 "글자 크기 조정" 기능과 자동 연동된다. 임의 px보다 이 토큰을 우선 사용할 것.
 - 카테고리/난이도 색상은 `lib/case-meta.ts`(`CATEGORY_META`, `DIFFICULTY_META`)가 유일한 출처다. 페이지마다 색상을 새로 정의하지 않는다.
 - `overflow-hidden` + 절대 위치 자식 조합은 Chromium에서 부모 높이가 찌그러지는 버그가 있다 — hover 등 시각 효과는 `box-shadow: inset 0 0 0 999px rgba(...)` 방식을 우선 사용한다.
+- `globals.css`에 커스텀 애니메이션 클래스를 추가할 때 클래스 이름을 **`animate-`로 시작하면 안 된다** — Tailwind v4가 이를 자기 유틸리티 네임스페이스로 가로채서, 매칭되는 테마 값이 없으면 `@layer components`에 직접 정의한 커스텀 클래스까지 조용히 무시해버린다(브라우저 콘솔 에러 없이 `animation-name: none`으로 렌더링됨). 커스텀 키프레임 클래스는 `call-ring-pulse`처럼 다른 접두사를 쓸 것 (`src/app/globals.css`의 `.call-ring-pulse` 참고).
 
 ### 컴포넌트
 - 인터랙션(useState/이벤트 핸들러/localStorage)이 필요한 페이지는 `"use client"` — 이 프로젝트는 대부분의 페이지가 클라이언트 컴포넌트다.
@@ -85,7 +87,7 @@ public/
 | US-03 | 학습하기(카테고리 필터) / 시나리오 상세 | `/learn`, `/learn/[caseId]` | 구현 |
 | US-04~08 | 미확인 (기록 탭 포함, 유저스토리 문서 재확인 필요) | `기록` 탭(`BottomNav`에서 `placeholder: true`) | 미구현 |
 | US-09 | 긴급 신고 안내 (112/1332, 대응·예방 수칙) | `/emergency` | 구현 |
-| US-10 | 설정 (글자 크기, TTS, 알림, 로그아웃/회원탈퇴) | `/settings` (회원탈퇴는 모달) | 구현 |
+| US-10 | 설정 (글자 크기, TTS, 알림, 로그아웃/회원탈퇴) | `/settings`, `/settings/account` | 구현 |
 
 ## 데이터/API 현황
 

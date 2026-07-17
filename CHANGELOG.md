@@ -2,6 +2,26 @@
 
 기능을 구현하거나 수정할 때마다 아래 형식으로 최상단에 추가한다 (기존 내용은 지우지 않음).
 
+## [2026-07-17] 전화 시뮬레이션 화면 반응형 전환
+- 수정/생성 파일: src/app/learn/[caseId]/call/page.tsx
+- 변경 내용: 처음에 고정 px(margin/padding/버튼·아이콘 크기/글자 크기)로 만들었던 걸 전부 `clamp(min, Ncqw/cqh, max)` 기반으로 재작성. 프로젝트 컨벤션(AGENTS.md 스타일링 규칙)을 놓쳤던 부분을 뒤늦게 맞춤.
+- 비고: `cqh`는 `@container`가 `inline-size`만 컨테인하면 동작 안 할 거라 예상했는데, 실제로는 상위에 block-size 컨테이너가 없어 viewport height 기준으로 폴백되어 정상적으로 반응형 동작함을 Playwright로 확인함 (뷰포트 높이 900→500→350에서 123px→120px→84px로 축소).
+
+## [2026-07-16] 전화 시뮬레이션(수신 전화 화면) 신규 구현
+- 수정/생성 파일: src/app/learn/[caseId]/call/page.tsx(신규), src/app/(main)/learn/[caseId]/page.tsx, src/lib/routes.ts
+- 변경 내용: Figma(node-id 33-656) 기준 "수신 전화" 시뮬레이션 화면 추가. 시나리오 상세 페이지의 "전화로 시작" 버튼이 이 화면(`/learn/[caseId]/call`)으로 연결되도록 연결. "시작하기"(초록) 버튼에만 버튼 안쪽에서 시작해 바깥으로 크게 퍼지는 커스텀 링 펄스 이펙트(`.call-ring-pulse`, 3개 링 시차 재생)를 넣고, "종료하기"(빨강) 버튼은 이펙트 없음.
+- 비고: 이 화면은 BackHeader/BottomNav가 없는 풀스크린 디자인이라 `(main)` 라우트 그룹 밖(`src/app/learn/[caseId]/call/`)에 배치함 — `(main)/learn/[caseId]/page.tsx`와는 다른 물리적 트리지만 URL은 `/learn/[caseId]` 하위로 자연스럽게 이어짐. "시작하기" 클릭 후 실제 통화 시뮬레이션 화면은 아직 미구현 — 현재는 두 버튼 모두 시나리오 상세로 돌아감. 처음엔 Tailwind `animate-ping`을 썼다가 시각적으로 더 자연스럽게 커스텀 키프레임(`call-ring`)으로 교체하는 과정에서, 클래스 이름을 `animate-call-ring`으로 지었더니 Tailwind v4가 이를 자기 유틸리티로 오인해 조용히 무시하는 버그를 발견 — `call-ring-pulse`로 개명해서 해결 (AGENTS.md에 규칙 추가).
+
+## [2026-07-16] 회원 탈퇴 완료 화면 Figma 업데이트 반영
+- 수정/생성 파일: src/app/(main)/settings/account/page.tsx, public/check.svg(삭제)
+- 변경 내용: "탈퇴 완료" 확인 화면을 최신 Figma(node-id 28-825)에 맞춰 재구현 — 3D 체크 이미지 대신 파란 원+체크 아이콘(react-icons), 전체너비 파란 버튼 대신 작은 회색 "확인" 버튼(101×36px)으로 변경. 카드 크기는 처음엔 고정 px(246×305)로 넣었다가, 전역 글자 크기 조정 기능과 반응형 컨벤션에 맞춰 clamp 기반 패딩/최대너비로 다시 변경 — 기준 화면에서 목표 크기에 근접하면서 좁은 화면에서도 자연스럽게 줄어듦.
+- 비고: 안 쓰이게 된 public/check.svg 삭제.
+
+## [2026-07-16] 회원 탈퇴를 다시 별도 페이지로 전환 + 탈퇴사유 조건부 노출
+- 수정/생성 파일: src/app/(main)/settings/account/page.tsx(재생성), src/app/(main)/settings/page.tsx, src/lib/routes.ts, AGENTS.md
+- 변경 내용: 회원 탈퇴를 설정 페이지 내 모달에서 다시 `/settings/account` 전용 페이지로 전환 (Figma 업데이트: BackHeader+BottomNav가 있는 풀페이지로 디자인됨). "탈퇴사유" 텍스트 입력란은 "기타" 선택 시에만 노출되도록 변경. 강조색을 orange(#f2994a)에서 앱 기본 블루(#60a5fa)로 통일. 부제 텍스트를 "피싱안전교실을 떠나는 이유를 알려주세요."로 변경(서비스명 표기 통일, 로그인 페이지와 동일).
+- 비고: 이전에 모달로 바꿨던 걸 다시 페이지로 되돌린 것 — Figma 쪽 디자인이 페이지 레이아웃(헤더/하단내비 포함)으로 업데이트되어 이를 반영함.
+
 ## [2026-07-15] 알림 시간 시/분 독립 저장 버그 수정
 - 수정/생성 파일: src/app/(main)/settings/page.tsx
 - 변경 내용: 마운트 시 시/분을 저장된 값으로 복원하는 로직이 `storedHour && storedMinute` 조건이라 둘 중 하나만 저장되어 있어도 둘 다 현재 시각으로 초기화되던 버그 수정. 이제 시/분을 각각 독립적으로 저장된 값이 있으면 그 값을, 없으면 현재 시각을 사용한다.

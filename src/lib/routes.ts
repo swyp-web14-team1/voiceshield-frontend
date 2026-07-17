@@ -9,10 +9,12 @@ export const ROUTES = {
 
   learn: "/learn", // US-03 학습하기
   scenario: (caseId: string) => `/learn/${caseId}`, // US-03 학습 시나리오 상세
+  call: (caseId: string) => `/learn/${caseId}/call`, // US-03 전화 시뮬레이션(수신 전화 화면)
 
   record: "/record", // US-04~08 학습 기록
 
   emergency: "/emergency", // US-09 긴급 신고 안내
 
-  settings: "/settings", // US-10 설정 (회원 탈퇴는 별도 라우트가 아니라 /settings 내 모달)
+  settings: "/settings", // US-10 설정
+  settingsAccount: "/settings/account", // US-10 회원탈퇴
 } as const;

@@ -29,7 +29,7 @@
   --text-xs: calc(var(--font-scale, 1) * clamp(12px, 2.4cqw, 12px));
   --text-sm: calc(var(--font-scale, 1) * clamp(13px, 2.8cqw, 14px));
   --text-base: calc(var(--font-scale, 1) * clamp(13px, 3.2cqw, 16px));
-  --text-xl: calc(var(--font-scale, 1) * clamp(15px, 4cqw, 20px));
+  --text-xl: calc(var(--font-scale, 1) * clamp(17px, 5cqw, 20px));
   --text-3xl: calc(var(--font-scale, 1) * clamp(13px, 6cqw, 30px));
 }
 
@@ -89,5 +89,20 @@ button {
     border-radius: 16px;
     font-size: 16px;
     font-weight: 600;
+  }
+
+  .call-ring-pulse {
+    animation: call-ring 2.1s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+  }
+}
+
+@keyframes call-ring {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
   }
 }

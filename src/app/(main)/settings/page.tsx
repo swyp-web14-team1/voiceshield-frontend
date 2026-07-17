@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Prata } from "next/font/google";
 import { FiChevronDown, FiChevronUp, FiX } from "react-icons/fi";
 import { IoVolumeMedium, IoVolumeMediumOutline } from "react-icons/io5";
 import { ROUTES } from "@/lib/routes";
@@ -12,8 +10,6 @@ import { AUTH_STORAGE_KEY } from "@/lib/auth";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { ChatBubbleIcon, ArrowIcon } from "@/components/icons/kakao-icons";
 import { FONT_SIZES, useFontScale } from "@/components/providers/FontScaleProvider";
-
-const prata = Prata({ weight: "400", subsets: ["latin"] });
 
 const FONT_SIZE_TEXT_CLASS: Record<(typeof FONT_SIZES)[number], string> = {
   보통: "text-[12px]",
@@ -26,14 +22,6 @@ const REMINDER_MINUTE_STORAGE_KEY = "voiceshield-reminder-minute";
 const TTS_SPEEDS = ["X 0.5", "X 1.0", "X 1.5", "X 2.0"] as const;
 const TTS_VOICES = ["V1", "V2", "V3", "V4"] as const;
 const PREVIEW_TEXT = "안녕하세요, 보이스쉴드입니다. 피싱 예방 교육을 시작할게요.";
-const WITHDRAW_REASONS = [
-  "서비스 퀄리티가 낮아요",
-  "신뢰도가 떨어져요",
-  "대체할 만한 서비스를 찾았어요",
-  "서비스 사용이 어려워요",
-  "부담감이 있어요",
-  "기타",
-] as const;
 
 
 const FALLBACK_PITCH: Record<(typeof TTS_VOICES)[number], number> = {
@@ -120,10 +108,6 @@ export default function SettingsPage() {
   const [showInstallGuide, setShowInstallGuide] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
-  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
-  const [showWithdrawComplete, setShowWithdrawComplete] = useState(false);
-  const [withdrawReason, setWithdrawReason] = useState<(typeof WITHDRAW_REASONS)[number] | null>(null);
-  const [withdrawDetail, setWithdrawDetail] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -187,17 +171,6 @@ export default function SettingsPage() {
     scheduleNext();
     return () => clearTimeout(timeoutId);
   }, [isLoggedIn, reminderOn, hour, minute, router]);
-
-  const handleWithdrawConfirm = () => {
-    localStorage.setItem(AUTH_STORAGE_KEY, "false");
-    router.push(ROUTES.login);
-  };
-
-  const closeWithdrawForm = () => {
-    setShowWithdrawForm(false);
-    setWithdrawReason(null);
-    setWithdrawDetail("");
-  };
 
   const handleToggleReminder = async () => {
     if (!isLoggedIn) {
@@ -443,13 +416,9 @@ export default function SettingsPage() {
             </Link>
           )}
           {isLoggedIn && (
-            <button
-              type="button"
-              onClick={() => setShowWithdrawForm(true)}
-              className="pb-2 text-center text-base font-medium text-gray-600 underline"
-            >
+            <Link href={ROUTES.settingsAccount} className="pb-2 text-center text-base font-medium text-gray-600 underline">
               회원 탈퇴
-            </button>
+            </Link>
           )}
         </div>
       </div>
@@ -546,95 +515,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {showWithdrawForm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={closeWithdrawForm}
-        >
-          <div
-            className="my-auto flex max-h-full w-full max-w-100 flex-col gap-6 overflow-y-auto rounded-xl border border-[#b1b8be] bg-white p-6 px-7 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-col gap-2">
-              <h2 className="text-xl font-bold text-[#1a2332]">회원 탈퇴</h2>
-              <p className={`text-sm text-[#4B5563] ${prata.className}`}>VoiceShield를 떠나는 이유를 알려주세요.</p>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              {WITHDRAW_REASONS.map((r) => {
-                const selected = withdrawReason === r;
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setWithdrawReason(r)}
-                    className="flex items-center gap-2 text-left"
-                  >
-                    <span
-                      className={`flex size-6 shrink-0 items-center justify-center rounded-full border ${
-                        selected ? "border-[#f2994a]" : "border-[#9ca3af]"
-                      }`}
-                    >
-                      {selected && <span className="size-4 rounded-full bg-[#f2994a]" />}
-                    </span>
-                    <span className={`text-sm font-bold ${selected ? "text-[#111827]" : "text-[#4b5563]"}`}>{r}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold text-[#4b5563]">탈퇴사유</p>
-              <textarea
-                value={withdrawDetail}
-                onChange={(e) => setWithdrawDetail(e.target.value)}
-                placeholder="탈퇴사유를 입력해주세요."
-                className="h-36 w-full resize-none rounded-md border border-[#4B5563] px-4 py-2 text-sm text-[#9CA3AF] placeholder:text-gray-400 focus:outline-none"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeWithdrawForm}
-                className="flex h-11 min-w-17 items-center justify-center rounded-md px-5 text-sm font-medium text-gray-900"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                disabled={!withdrawReason}
-                onClick={() => {
-                  setShowWithdrawForm(false);
-                  setShowWithdrawComplete(true);
-                }}
-                className="flex h-8 min-w-17 items-center justify-center rounded-md bg-[#f2994a] px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                제출하기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showWithdrawComplete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5">
-          <div className="flex w-full max-w-90 flex-col items-center gap-4 rounded-2xl border border-[#b1b8be] bg-white px-6 pt-6 pb-6">
-            <Image src="/check.svg" alt="" width={80} height={80} priority className="size-24" />
-            <div className="flex flex-col items-center gap-2 text-center">
-              <p className="text-xl font-bold text-[#17191a]">회원 탈퇴 완료</p>
-              <p className="text-sm text-[#4B5563]">탈퇴 처리가 완료되었습니다.</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleWithdrawConfirm}
-              className="flex h-11 w-full items-center justify-center rounded-md bg-[#f2994a] text-sm font-medium text-white"
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

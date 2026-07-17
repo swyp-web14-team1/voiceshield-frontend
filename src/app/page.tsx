@@ -38,14 +38,14 @@ export default function LoginPage() {
       >
         <Image
           src="/logo.svg"
-          alt="피싱안심지킴이"
+          alt="피싱안전교실"
           width={96}
           height={96}
           priority
           style={{ width: "clamp(56px, 19.2cqw, 96px)", height: "clamp(56px, 19.2cqw, 96px)" }}
         />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">
-          피싱안심지킴이
+          피싱안전교실
         </h1>
         <p className="text-sm leading-[1.45] tracking-tight text-gray-600 dark:text-gray-400 ">
           실전 시뮬레이션으로 배우는

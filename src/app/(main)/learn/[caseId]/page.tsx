@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { BiPhoneCall } from "react-icons/bi";
 import { LuMessageSquareMore } from "react-icons/lu";
 import { getCaseById } from "@/lib/mock-cases";
@@ -83,14 +84,14 @@ export default async function ScenarioDetailPage({ params }: { params: Promise<{
       </div>
 
       <div className="flex shrink-0 items-center justify-center gap-9 border-t border-gray-200 bg-white px-4 py-2.75">
-        <button
-          type="button"
+        <Link
+          href={ROUTES.call(caseId)}
           className="flex w-31.75 items-center justify-center gap-1.25 rounded-lg py-2.5 text-sm font-bold text-white shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] transition-shadow [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),inset_0_0_0_999px_rgba(0,0,0,0.12)]"
           style={{ backgroundImage: "linear-gradient(90deg, #60a5fa 0%, #2849be 100%)" }}
         >
           <BiPhoneCall size={17} />
           전화로 시작
-        </button>
+        </Link>
         <button
           type="button"
           className="flex w-31.75 items-center justify-center gap-1.25 rounded-lg bg-white py-2.5 text-sm font-bold text-blue-600 shadow-[0px_1px_3px_rgba(0,0,0,0.1)] transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:bg-blue-50"
