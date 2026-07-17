@@ -132,6 +132,8 @@ UI를 변경했다면 실제 렌더링으로 검증한다:
 2. 스크린샷/상호작용으로 검증 (모바일 뷰포트 포함, `devices["iPhone 13"]` 등)
 3. 검증 후 `npm uninstall playwright` + 임시 테스트 스크립트 삭제 + 개발 서버 프로세스 종료까지 반드시 정리한다
 
+**실제 모바일 기기로 테스트할 때 주의**: `npm run dev`(HMR용 웹소켓 필요) + ngrok 조합은 실기기에서 JS가 아예 로드/실행되지 않는 문제가 실제로 있었다 (버튼 클릭 등 모든 onClick 상호작용이 무반응 — `<Link>`의 href 기반 네비게이션만 동작). 실기기 테스트는 `npm run build && npm run start`(프로덕션 빌드, HMR 없음)로 하거나 실제 배포(Vercel) URL로 할 것.
+
 # UI conventions
 
 - Every clickable element must show `cursor: pointer`. All native `<button>` elements get this automatically via the global `button { cursor: pointer; }` rule in `src/app/globals.css` — do not remove it. Any `<div>`/`<span>`/etc. acting as a button via `onClick` (not a native `<button>` or `<a>`) needs `cursor-pointer` added explicitly in its className.

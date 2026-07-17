@@ -28,13 +28,13 @@ export default function LoginPage() {
     <div
       className="flex min-h-full flex-1 flex-col items-center"
       style={{
-        paddingTop: "clamp(96px, 36.4cqw, 230px)",
-        paddingBottom: "clamp(16px, 6.4cqw, 32px)",
+        paddingTop: "clamp(160px, 25cqh, 230px)",
+        paddingBottom: "clamp(16px, 4cqh, 32px)",
       }}
     >
       <div
         className="flex flex-col items-center text-center"
-        style={{ gap: "clamp(8px, 3.2cqw, 16px)" }}
+        style={{ gap: "clamp(8px, 2cqh, 16px)" }}
       >
         <Image
           src="/logo.svg"
@@ -58,7 +58,7 @@ export default function LoginPage() {
         className="flex flex-col self-stretch"
         style={{
           marginInline: "clamp(42px, 20cqw, 100px)",
-          marginTop: "clamp(32px, 13.6cqw, 68px)",
+          marginTop: "clamp(24px, 8cqh, 68px)",
         }}
       >
         <div className="flex flex-col" style={{ gap: "clamp(4px, 1.6cqw, 8px)" }}>
@@ -94,7 +94,7 @@ export default function LoginPage() {
         </div>
         <p
           className="px-4 text-center text-[0.625rem] leading-relaxed text-gray-500 dark:text-gray-700"
-          style={{ marginTop: "clamp(14px, 5.8cqw, 29px)" }}
+          style={{ marginTop: "clamp(10px, 3.5cqh, 29px)" }}
         >
           로그인하면 이용약관 및 개인정보 처리방침에
           <br />
