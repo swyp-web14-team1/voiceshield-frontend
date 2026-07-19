@@ -55,7 +55,7 @@ export function CategoryTagRow({ value, onChange }: CategoryTagRowProps) {
         className={`shrink-0 rounded-full text-[clamp(12px,3.2cqw,14px)] font-medium whitespace-nowrap ${
           value === "all" ? "bg-gray-600 text-white" : "bg-white text-gray-600 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
         }`}
-        style={{ paddingInline: "clamp(12px, 4cqw, 16px)", paddingBlock: "clamp(4px, 1cqw, 6px)" }}
+        style={{ paddingInline: "clamp(12px, 4cqw, 16px)", paddingBlock: "clamp(5px, 1cqw, 6px)" }}
       >
         전체
       </button>
