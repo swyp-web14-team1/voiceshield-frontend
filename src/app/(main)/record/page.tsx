@@ -1,16 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiChevronRight } from "react-icons/fi";
 import { IoCheckmarkCircle } from "react-icons/io5";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { CATEGORY_META, DIFFICULTY_META } from "@/lib/case-meta";
-import { MOCK_CASES } from "@/lib/mock-cases";
 import { ROUTES } from "@/lib/routes";
+import { applyProgressOverrideToAll, readProgressSnapshot, type ProgressSnapshot } from "@/lib/progress";
 import type { CaseCategory, PhishingCase } from "@/types";
 
-const RELATIVE_TIME_LABELS = ["어제", "3일 전", "1주일 전", "3주일 전", "1개월 전"];
+const EMPTY_PROGRESS_SNAPSHOT: ProgressSnapshot = { recentInProgressCaseId: null, overrides: {} };
+
+function formatRelativeTime(timestamp: number): string {
+  const diffMs = Date.now() - timestamp;
+  const diffMinutes = Math.floor(diffMs / (60 * 1000));
+  if (diffMinutes < 1) return "방금 전";
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}일 전`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 4) return `${diffWeeks}주 전`;
+  return `${Math.floor(diffDays / 30)}개월 전`;
+}
 
 function RecordSectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -99,23 +113,44 @@ function RecentCaseRow({
 
 export default function RecordPage() {
   const [showAllCompleted, setShowAllCompleted] = useState(false);
+  // localStorage 기반 진행 기록은 서버에서 읽을 수 없으므로, 초기값은 서버·클라이언트 동일하게 빈 스냅샷으로 고정하고
+  // 실제 값은 마운트 후 useEffect에서 읽는다 (하이드레이션 불일치 방지).
+  const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
 
-  const completedCases = MOCK_CASES.filter((c) => c.isCompleted);
-  const totalCount = MOCK_CASES.length;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
+    setProgress(readProgressSnapshot());
+  }, []);
+
+  const casesWithProgress = applyProgressOverrideToAll(progress);
+  const completedCases = casesWithProgress.filter((c) => c.isCompleted);
+  const totalCount = casesWithProgress.length;
   const completedCount = completedCases.length;
   const progressPercent = Math.round((completedCount / totalCount) * 100);
 
-  const categoryAverages = (Object.keys(CATEGORY_META) as CaseCategory[]).map((category) => {
-    const cases = MOCK_CASES.filter((c) => c.category === category);
-    const avg = cases.reduce((sum, c) => sum + c.completionRate, 0) / cases.length;
-    return { category, avg };
+  // 카테고리별 취약 여부는 AI 분석에서 나온 정답률(accuracy)을 우선 사용하고, 아직 분석을 본 적 없는
+  // 카테고리는 completionRate(진행 단계)로 대신 판단한다.
+  const categoryScores = (Object.keys(CATEGORY_META) as CaseCategory[]).map((category) => {
+    const cases = casesWithProgress.filter((c) => c.category === category);
+    const accuracies = cases
+      .map((c) => progress.overrides[c.id]?.accuracy)
+      .filter((a): a is number => a !== undefined);
+
+    if (accuracies.length > 0) {
+      const avgAccuracy = accuracies.reduce((sum, a) => sum + a, 0) / accuracies.length;
+      return { category, score: avgAccuracy, isWeak: avgAccuracy < 70 };
+    }
+    const avgCompletion = cases.reduce((sum, c) => sum + c.completionRate, 0) / cases.length;
+    return { category, score: avgCompletion, isWeak: avgCompletion < 50 };
   });
-  const weakCategories = categoryAverages
-    .filter((c) => c.avg < 50)
-    .sort((a, b) => a.avg - b.avg)
+  const weakCategories = categoryScores
+    .filter((c) => c.isWeak)
+    .sort((a, b) => a.score - b.score)
     .map((c) => c.category);
 
-  const recentCases = [...MOCK_CASES].sort((a, b) => b.completionRate - a.completionRate);
+  const recentCases = casesWithProgress
+    .filter((c) => (progress.overrides[c.id]?.updatedAt ?? 0) > 0)
+    .sort((a, b) => (progress.overrides[b.id]?.updatedAt ?? 0) - (progress.overrides[a.id]?.updatedAt ?? 0));
   const visibleCompletedCases = showAllCompleted ? completedCases : completedCases.slice(0, 2);
 
   return (
@@ -143,12 +178,12 @@ export default function RecordPage() {
         </section>
 
         <section className="flex h-14.5 items-center justify-between rounded-xl bg-white px-4.5 shadow-[0px_1px_3px_rgba(0,0,0,0.07)]">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <IoCheckmarkCircle className="text-[#f97316]" size={16} />
             <p className="text-sm font-semibold text-[#1a2332]">완료 시나리오 개수</p>
           </div>
           <p className="flex items-baseline gap-0.5">
-            <span className="text-[28px] font-bold text-orange-500">{completedCount}</span>
+            <span className="text-[clamp(18px,6cqw,28px)] font-semibold text-orange-500">{completedCount}</span>
             <span className="text-[13px] font-medium text-gray-500">개</span>
           </p>
         </section>
@@ -187,16 +222,20 @@ export default function RecordPage() {
         </RecordSectionCard>
 
         <RecordSectionCard title="최근 진행한 학습">
-          <div className="flex flex-col">
-            {recentCases.map((c, index) => (
-              <RecentCaseRow
-                key={c.id}
-                phishingCase={c}
-                timeLabel={RELATIVE_TIME_LABELS[index % RELATIVE_TIME_LABELS.length]}
-                isLast={index === recentCases.length - 1}
-              />
-            ))}
-          </div>
+          {recentCases.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-500">아직 진행한 학습이 없어요</p>
+          ) : (
+            <div className="flex flex-col">
+              {recentCases.map((c, index) => (
+                <RecentCaseRow
+                  key={c.id}
+                  phishingCase={c}
+                  timeLabel={formatRelativeTime(progress.overrides[c.id]?.updatedAt ?? 0)}
+                  isLast={index === recentCases.length - 1}
+                />
+              ))}
+            </div>
+          )}
         </RecordSectionCard>
       </div>
     </div>

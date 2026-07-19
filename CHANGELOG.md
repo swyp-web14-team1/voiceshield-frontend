@@ -2,6 +2,201 @@
 
 기능을 구현하거나 수정할 때마다 아래 형식으로 최상단에 추가한다 (기존 내용은 지우지 않음).
 
+## [2026-07-18] 학습하기 화면 카테고리 태그 반응형화
+- 수정/생성 파일:
+  - `src/components/learn/CategoryTagRow.tsx` — 태그 간 간격(`gap-2.5`)과 각 태그의 좌우/상하 패딩·글자 크기를 고정값에서 `clamp()` 기반 반응형으로 변경.
+  - `src/app/(main)/learn/page.tsx` — 검색창·태그 영역과 "최근 학습한 사례" 카드 사이 간격(`pb-6` 고정값)을 `clamp(16px,6cqw,24px)`로 반응형화.
+- 비고: 320px/500px 두 폭에서 Playwright로 태그 크기·간격이 자연스럽게 늘고 줄어드는 것을 확인.
+
+## [2026-07-18] "취약 유형"을 AI 분석 정답률 기준으로 계산하도록 연결
+- 수정/생성 파일:
+  - `src/lib/progress.ts` — `StoredCaseProgress`에 `accuracy?: number` 필드 추가, `recordAnalysisAccuracy(caseId, accuracy)` 함수 추가 (completionRate/isCompleted는 건드리지 않고 accuracy만 갱신).
+  - `src/app/learn/[caseId]/call/analysis/page.tsx` — AI 분석(`/api/analyze`) 응답을 받은 직후, 클라이언트에서 계산한 퀴즈 정답률(quizAccuracy)을 `recordAnalysisAccuracy`로 저장.
+  - `src/app/(main)/record/page.tsx` — "취약 유형" 계산 로직 변경: 카테고리에 AI 분석을 본 적 있는 케이스가 있으면 그 정답률 평균(70% 미만이면 취약)을 우선 사용하고, 아직 한 번도 분석을 안 본 카테고리는 기존처럼 completionRate 평균(50% 미만이면 취약)으로 판단.
+- 변경 내용: "AI 분석으로 나왔던 취약 유형을 학습 기록에 반영해달라"는 요청 — 이전에는 "취약 유형"이 실제 퀴즈 정답 여부와 무관하게 진행 단계(completionRate)만으로 계산됐는데, 이제 AI 분석까지 완료한 케이스는 실제 정답률이 반영됨.
+- 비고: 오답 1개·정답 1개(정답률 50%)로 institution-01의 AI 분석을 완료시킨 뒤, "기관사칭"이 취약 유형 목록에 정확히 나타나는 것을 Playwright로 확인.
+
+## [2026-07-18] 학습 기록 "최근 진행한 학습" 정렬을 실제 시간 기준으로 수정
+- 수정/생성 파일: src/app/(main)/record/page.tsx
+- 변경 내용: "최근 진행한 학습" 목록이 실제 시간이 아니라 `completionRate` 순으로 정렬돼 있던 버그 수정 — `lib/progress.ts`에 이미 저장되고 있던 `updatedAt` 타임스탬프 기준 내림차순으로 정렬하도록 변경. 진행 기록이 아예 없는 케이스는 목록에서 제외하고, 하나도 없으면 "아직 진행한 학습이 없어요" 빈 상태 문구를 보여줌. 표시되는 "어제"/"3일 전" 등도 고정 배열을 순서대로 매기던 가짜 값이었는데, `updatedAt` 기준으로 실제 상대 시간("N분 전"/"N시간 전"/"N일 전" 등)을 계산하는 `formatRelativeTime`으로 교체.
+- 비고: 사용자가 "최근 진행한 학습이 실제 활동과 연결됐냐"고 물어봐서 점검하다 발견한 버그. "취약 유형"은 별도로 점검했는데, 케이스별 `completionRate`(도달한 시뮬레이션 단계) 평균으로 계산되는 게 맞게 동작 중임을 확인 — 다만 AI 분석 결과(좋았던 점/놓친 부분 등)는 어디에도 저장되지 않고 매번 새로 생성만 되므로, 실제 퀴즈 정답 여부나 AI 피드백 내용이 "취약 유형" 계산에는 반영되지 않는다는 점은 현재 구조상 한계로 남아있음.
+
+## [2026-07-18] 시뮬레이션 완료 화면이 스크롤 중간부터 보이던 버그 수정
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: 대화(dialogue) 단계와 완료(complete) 단계의 스크롤 컨테이너(`<div className="no-scrollbar flex-1 overflow-y-auto">`)가 JSX 트리에서 같은 위치에 있어 React가 DOM 엘리먼트를 그대로 재사용하고 있었음 — 그 결과 대화가 진행되며 아래로 스크롤됐던 위치(scrollTop)가 완료 화면에도 그대로 남아, 완료 화면이 맨 위가 아니라 스크롤 중간(약 160px 아래)부터 보이는 버그가 있었음. 두 컨테이너에 각각 `key="dialogue"`/`key="complete"`를 지정해 phase가 바뀔 때 React가 완전히 새로운 DOM으로 마운트하도록 수정 — 새로 마운트된 요소는 기본적으로 scrollTop이 0이라 완료 화면이 항상 맨 위부터 보이게 됨.
+- 비고: 사용자가 "완료 화면이 아래에서부터 나온다"고 보고한 현상 — Playwright로 두 스크롤 컨테이너의 `scrollTop`을 직접 측정해 재현(수정 전 160px, 수정 후 0px)한 뒤 확인.
+
+## [2026-07-18] QuizCard 선택지 세부 정렬/레이아웃 수정
+- 수정/생성 파일:
+  - `src/components/learn/QuizCard.tsx` — 번호("1." 등)와 선택지 텍스트를 감싼 flex의 `items-start`를 `items-center`로 변경해, 2줄 이상으로 줄바꿈되는 선택지에서도 번호가 전체 텍스트 세로 중앙에 오도록 수정. 선택지 텍스트에 `break-keep` 추가(단어 단위 줄바꿈). 정답/오답 아이콘이 선택 후에만 나타나면서 텍스트 영역이 좁아져 줄바꿈이 밀리던 문제 — 아이콘 자리를 `size-5` 고정 슬롯으로 항상 확보해 선택 전후 레이아웃이 흔들리지 않도록 수정. 선택지 버튼의 내부 패딩(`paddingInline`/`paddingBlock`)도 더 작은 최솟값으로 축소.
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — 통화 대화 영역 wrapper의 좌우 패딩(`px-8` 고정값)을 `clamp(16px,8cqw,32px)`로 반응형화.
+- 비고: 아이콘 등장 시 텍스트가 밀려 줄 수가 바뀌던 문제와, 좁은 화면에서 번호가 텍스트 첫 줄에만 붙어 있던 문제를 Playwright로 선택 전/후 스크린샷 비교하여 검증.
+
+## [2026-07-18] 학습 시나리오 상세 화면 간격 반응형화
+- 수정/생성 파일: src/app/(main)/learn/[caseId]/page.tsx
+- 변경 내용: 완료율/난이도 카드, 요약/실제 사례/예시 문자/예시 전화 대화 섹션 사이의 고정 `mt-6.25`/`mt-7.75` 간격을 `clamp()` 기반 반응형으로 변경. 하단 "전화로 시작"/"문자로 시작" 버튼도 고정 너비(`w-31.75`)·간격(`gap-9`)·패딩을 모두 `clamp()`로 축소 및 반응형화 (버튼 사이 간격은 이후 `clamp(10px, 3cqw, 20px)`로 한 번 더 줄임).
+
+## [2026-07-18] 학습 진행률/완료 상태를 실제 활동 기반으로 추적하도록 변경
+- 수정/생성 파일:
+  - `src/lib/progress.ts` (신규) — `voiceshield-case-progress` localStorage 키에 케이스별 `{completionRate, isCompleted, updatedAt}`을 저장. `recordCaseProgress(caseId, phase)`로 단계 진입 시 기록(dialogue 30% → quiz 60% → complete 90% → finalQuiz 100%+완료 처리, 더 낮은 값으로는 덮어쓰지 않음), `readProgressSnapshot()`으로 전체 기록과 "가장 최근에 진행했지만 미완료인 케이스"를 읽고, `applyProgressOverride(All)`로 `mock-cases.ts`의 정적 값을 실제 기록으로 덮어씀.
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — `phase` 변경마다 `recordCaseProgress` 호출.
+  - `src/app/learn/[caseId]/call/quiz/page.tsx` — "정답 제출" 클릭 시 `recordCaseProgress(caseId, "finalQuiz")` 호출(완료 처리).
+  - `src/app/(main)/home/page.tsx` — "use client"로 전환. "이어서 학습하기" 카드가 하드코딩된 `institution-01` 대신, 진행 기록이 있으면 가장 최근에 진행한(미완료) 케이스를 보여주고 진행률도 실제 값을 표시.
+  - `src/app/(main)/learn/page.tsx` — "최근 학습한 사례" 카드와 시나리오 목록 전체에 동일하게 실제 진행률 반영.
+  - `src/app/(main)/record/page.tsx` — 전체 학습 진행률/완료 시나리오 개수/취약 유형/최근 진행한 학습 정렬 모두 실제 기록 기준으로 계산하도록 변경.
+- 비고: localStorage는 서버에서 읽을 수 없어, 진행 기록을 반영하는 4개 페이지 모두 초기 상태는 서버·클라이언트 동일한 빈 스냅샷으로 고정하고 마운트 후 `useEffect`에서만 읽어오는 패턴(이 세션에서 반복적으로 다졌던 하이드레이션 안전 패턴)을 그대로 적용. family-01 시뮬레이션을 실제로 진행한 뒤 홈/학습하기 화면에 즉시 반영되는 것을 Playwright로 확인.
+
+## [2026-07-18] "퀴즈N/선택N" 배지+문항을 행잉 인덴트에서 단순 상하 배치로 되돌림
+- 수정/생성 파일: src/app/learn/[caseId]/call/quiz/page.tsx, src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: "퀴즈1"/"선택N" 배지와 문항 텍스트가 한 줄을 공유하던 행잉 인덴트 방식을, 배지가 항상 자기 줄을 차지하고 문항 텍스트는 그 아래에서 시작하는 단순 `flex-col` 배치로 되돌림. 정답/오답 선택 배지(아이콘+선택한 답변 텍스트)에도 같은 행잉 인덴트를 시도했다가("아이콘 옆에 텍스트가 줄바꿈되면 아이콘 위치에 맞춰 정렬") 첫 줄의 왼쪽 패딩이 사라지는 부작용이 있어(음수 text-indent가 첫 줄의 padding을 상쇄하는 게 원인) 요청에 따라 원래의 단순 `flex items-center` 아이콘+텍스트 배치로 되돌림.
+- 비고: 행잉 인덴트 자체는 잘 동작했으나, 요구사항이 "문항은 배지 아래" + "정답 배지는 아이콘 옆 그대로"로 정리되어 배지+문항만 상하 배치를 유지하고 나머지는 원복함.
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/call/quiz/page.tsx` — 배지 실측 너비(48.375px) + 여백(8px) = 56.375px인데 `padding-left`/`text-indent`를 60px로 잡아 약 4px 어긋나 있던 것을 56px로 정확히 맞춤.
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — 완료 화면의 "선택N" 배지+문항 텍스트도 동일한 행잉 인덴트 패턴으로 변경 (기존 `@[450px]:flex-row` 반응형 전환 방식 대체). 배지를 포함한 문단이 하나로 합쳐지면서, 좁은 화면에서는 자연스러운 텍스트 줄바꿈으로 배지 아래에 문항이 내려가고, 넓으면 배지 옆에 이어지는 동작이 별도 브레이크포인트 없이도 그대로 유지됨.
+- 비고: 행잉 인덴트는 텍스트가 배지 옆에 붙을 공간이 없으면 자동으로 다음 줄로 넘어가므로, 기존 컨테이너 쿼리 기반 반응형 전환 없이도 "좁으면 아래로, 넓으면 옆으로"가 자연스럽게 재현됨.
+- 수정/생성 파일: src/app/learn/[caseId]/call/quiz/page.tsx
+- 변경 내용: `@[450px]:flex-row` 반응형 전환(넓으면 배지·문항이 한 줄, 좁으면 배지 아래로 문항이 내려감) 대신, 배지+문항을 하나의 `<p>`로 합치고 `padding-left`와 음수 `text-indent`를 이용한 행잉 인덴트(hanging indent)로 변경 — 문항이 여러 줄로 줄바꿈되어도 모든 줄이 배지 바로 뒤(첫 줄 텍스트 시작 위치)에 맞춰 정렬됨.
+- 비고: 처음 구현 시 배지 안의 "퀴즈1" 글자가 배지 테두리 밖으로 빠져나와 렌더링되는 버그가 있었음 — 원인은 `text-indent`가 상속 속성이라, `inline-block`인 배지가 부모의 음수 `text-indent`를 그대로 물려받아 배지 자신의 텍스트 위치에도 다시 적용됐기 때문. 배지에 `textIndent: 0`을 명시해서 해결.
+- 수정/생성 파일: src/app/learn/[caseId]/call/quiz/page.tsx
+- 변경 내용:
+  - 배너 바깥 컨테이너를 `justify-between`에서 `justify-center`로 변경 — 텍스트+버튼 그룹과 체크리스트 그룹이 카드 양 끝에 붙지 않고 가운데로 모이도록 함.
+  - "간편 로그인 하고 / 이번 학습을 저장해보세요!" 문구는 왼쪽 정렬(`text-left`) 유지, 그 컬럼 자체만 배너 중앙으로 이동.
+  - 체크리스트 pill 3개(`학습 진행률 저장` 등)를 부모 `items-end`에서 `items-stretch` + 각 pill `justify-center`로 변경해 텍스트 길이와 무관하게 모두 같은 너비로 맞춤.
+  - "Kakao로 시작하기" 버튼: `justify-between`이 버튼 내부 요소(아이콘+텍스트 / 화살표)를 양 끝으로 밀어버리는 문제가 있어 제거하고 `gap-6`만으로 간격 고정. 오타로 깨져 있던 `font-ㅡ` 클래스를 `font-semibold`로 수정. 아이콘·텍스트·화살표가 한 줄로 안 맞아 보이던 것은 `text-xs`의 기본 line-height가 원인 — 버튼에 `leading-none`을 추가하고, 내부 span의 효과 없는 `text-center`(flex 자식에는 적용 안 됨)를 `items-center`로 교체해 해결.
+- 비고: 사용자가 IDE에서 동시에 파일을 직접 편집하고 있어 저장 충돌(디스크가 더 최신이라는 경고)이 있었음 — 충돌 발생 시 무조건 덮어쓰지 말고 diff를 확인하도록 안내함.
+- 수정/생성 파일: src/app/learn/[caseId]/call/quiz/page.tsx
+- 변경 내용: pill 형태(가로로 긴 캡슐)에서 대각선이 잘 안 보인다고 판단해 그라디언트 각도를 `100deg`로 임의 조정했었으나, 사용자가 "홈 것을 그대로 가져오면 된다"고 재요청 — 각도·색상 정지점을 홈 화면 `CATEGORY_TILES`의 `135deg` 값과 완전히 동일하게 되돌림.
+
+## [2026-07-18] 간편 로그인 배너 체크리스트를 홈 화면과 동일한 글래스모피즘 스타일로 변경
+- 수정/생성 파일: src/app/learn/[caseId]/call/quiz/page.tsx
+- 변경 내용: "학습 진행률 저장" 등 체크리스트 항목을 단순 텍스트+체크 문자(`✓`)에서, `src/app/(main)/home/page.tsx`의 `CATEGORY_TILES` 카드와 동일한 글래스모피즘 pill로 변경 — `bg-white/8` + `backdrop-blur-lg` + `shadow-[...]` + 그라디언트 테두리(마스크 트릭으로 구현한 1px 그라디언트 보더) + `FiCheck` 아이콘. 체크리스트 폭이 넓어지면서 "Kakao로 시작하기" 버튼이 2줄로 줄바꿈되던 부작용도 `whitespace-nowrap`/`shrink-0`으로 함께 수정.
+- 비고: "홈에서 했던 코드 그대로 가져오면 된다"는 피드백에 따라, 처음 시도했던 단순 `bg-white/10` pill(반투명감이 부족하다는 피드백을 받음) 대신 홈 화면의 실제 글래스 카드 코드를 그대로 이식함.
+
+## [2026-07-18] 마무리 퀴즈 결과 화면 간편 로그인 배너 구조를 Figma(node 44:812)에 맞게 수정
+- 수정/생성 파일: src/app/learn/[caseId]/call/quiz/page.tsx
+- 변경 내용: "Kakao로 시작하기" 버튼이 그라디언트 카드 밖에 별도로 떠 있던 것을, Figma 디자인대로 카드 내부의 왼쪽 컬럼(텍스트 아래)으로 이동. 왼쪽 컬럼(안내 문구 + 버튼)과 오른쪽 컬럼(학습 진행률 저장/완료한 학습 기록/취약 유형 분석 체크리스트)이 한 카드 안에서 나란히 배치되도록 구조 변경.
+- 비고: 실제 Figma 링크(node-id=44-812)와 비교해 발견한 차이 — 기존 구현은 버튼을 카드 밖에 별도 엘리먼트로 두고 있었음.
+
+## [2026-07-18] 퀴즈 정답/오답 효과음 공용화 + 종료 확인 모달 컴포넌트 추출 + 배지 스타일 조정
+- 수정/생성 파일:
+  - `src/lib/sound.ts` (신규) — `playFeedbackTone(correct)`을 `quiz/page.tsx`에서 이 파일로 추출. 통화 중 판단 퀴즈(`QuizCard`)와 마무리 퀴즈가 동일한 효과음을 공유하도록 함.
+  - `src/components/learn/QuizCard.tsx` — 선택지 클릭 시 `playFeedbackTone`을 호출해 정답/오답 효과음이 나도록 추가 ("시나리오 퀴즈랑 똑같은 효과음으로 해달라"는 요청 반영 — 기존에는 통화 중 퀴즈에 효과음이 없었음).
+  - `src/components/learn/ExitConfirmModal.tsx` (신규) — `call/progress`, `call/analysis`, `call/quiz` 세 화면에 동일하게 복붙돼 있던 "학습을 종료하시겠습니까?" 모달을 `open`/`onExit`/`onCancel` props를 받는 공용 컴포넌트로 추출. 세 페이지 모두 이 컴포넌트를 사용하도록 변경 (`call/progress`는 종료 시 재생 중인 오디오/TTS를 멈추는 로직을 `onExit` 콜백으로 그대로 유지).
+  - `src/app/learn/[caseId]/call/quiz/page.tsx`, `src/app/learn/[caseId]/call/progress/page.tsx` — 결과 배지 텍스트의 `leading-none`을 `leading-tight`로 변경 (2줄로 줄바꿈될 때 줄 간격이 너무 빽빽해 보이던 문제). 마무리 퀴즈 결과 배지의 좌우 패딩을 고정 30px(`px-7.5`)에서 `clamp(8px,2.5cqw,16px)`로 다시 반응형화 — 좁은 화면에서 고정 30px 패딩 때문에 텍스트 줄바꿈이 부자연스러웠던 문제 수정.
+- 비고: `ExitConfirmModal` 추출은 사용자가 "컴포넌트로 하는 게 낫지 않냐"고 제안해서 진행 — AGENTS.md의 "반복되는 UI는 즉시 컴포넌트로 추출한다" 원칙에 맞춰 이번에 정리함.
+
+## [2026-07-18] 추천학습 카드 "학습하기" 버튼 텍스트 수직 정렬 수정 + 마무리 퀴즈 아이콘 색상
+- 수정/생성 파일:
+  - `src/components/cards/RecommendedCard.tsx` — "학습하기" 버튼에 `leading-none` 추가. `text-xs`의 기본 line-height(16px)가 12px 폰트 대비 여유가 있어, `items-center`로 정렬해도 한글 폰트 특성상 텍스트가 시각적으로 살짝 위로 치우쳐 보이던 문제 수정 (line-height를 폰트 크기에 맞게 압축). 이 컴포넌트는 홈 화면과 마무리 퀴즈 결과 화면에서 공용으로 쓰여 두 곳 모두에 적용됨.
+  - `src/app/learn/[caseId]/call/quiz/page.tsx` — "오늘의 추천학습" 옆 아이콘(`FiBookOpen`) 색상을 `text-gray-600`으로 지정 (기존에는 부모의 `text-[#1a2035]`를 그대로 상속).
+- 비고: 버튼 텍스트 정렬 문제는 line-height 자체보다, line-height가 폰트 크기보다 커서 생기는 여유 공간이 문제였음 — `leading-none`으로 정리.
+
+## [2026-07-18] 마무리 퀴즈 정답 제출 시 효과음/색상 피드백 + 세부 스타일 조정
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/call/quiz/page.tsx`:
+    - 기존 통화 중 퀴즈(`QuizCard`)처럼, "정답 제출" 클릭 시 정답이면 상승하는 2음(660Hz→880Hz sine), 오답이면 낮은 버저음(220Hz sawtooth)을 Web Audio API로 합성해 재생 (`playFeedbackTone`) — 별도 음원 파일 없이 오실레이터로 생성. 결과 화면의 정답/오답 아이콘·색상은 기존 구현을 그대로 사용.
+    - "정답 제출" 버튼에 명시적 `bg-white` 추가 (배경 없이 부모색이 비치던 것을 수정)
+    - 결과 화면의 선택한 답변 배지 좌우 패딩을 `clamp(12px,4cqw,24px)`에서 `px-7.5`(30px 고정)로 변경
+    - "다음 학습이 궁금하다면?" 섹션 위 여백을 부모의 `gap-3.5`(14px)에 `mt-1`(4px)을 더해 총 18px로 조정
+    - 본문 콘텐츠 좌우 패딩을 `px-4`에서 `px-4.25`(17px)로, 상하 패딩을 `py-5`에서 `py-3.5`(14px)로 변경
+  - `src/app/learn/[caseId]/call/analysis/page.tsx`:
+    - "놓친 부분" 목록 텍스트 색을 `text-gray-700`에서 `text-[#df1e21]/60`으로 변경 (놓친 부분임을 시각적으로 더 명확히 강조)
+    - 본문 콘텐츠 좌우 패딩도 동일하게 `px-4.25`, 상하 패딩 `py-3.5`로 변경
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — 완료 화면 문항 카드 리스트 wrapper도 동일하게 `px-4.25 py-3.5`로 변경
+- 변경 내용: 세 화면(마무리 퀴즈/AI 분석 결과/통화 완료) 모두 본문 여백을 동일한 규격(좌우 17px, 상하 14px)으로 통일. Playwright로 버튼 배경색, 배지 패딩, 섹션 간격, 텍스트 색상값을 모두 실측 검증.
+
+## [2026-07-18] 마무리 퀴즈 화면 구현 (Figma node 44:765/44:812/44:810 기반)
+- 수정/생성 파일:
+  - `src/types/index.ts` — `PhishingCase`에 `finalQuiz: QuizQuestion` 필드 추가 (마무리 퀴즈용 단일 문항, 통화 중 퀴즈와 같은 주제의 다른 문항)
+  - `src/lib/mock-cases.ts` — `MOCK_CASES` 5개 케이스 전부에 `finalQuiz` 데이터 추가
+  - `src/lib/routes.ts` — `ROUTES.callQuiz` 추가
+  - `src/components/learn/QuizCard.tsx` (신규) — 기존 `call/progress/page.tsx`에 로컬로 정의돼 있던 `QuizCard`(선택 즉시 정답/오답 표시)를 공용 컴포넌트로 추출. `call/progress/page.tsx`는 이 컴포넌트를 import하도록 변경
+  - `src/app/learn/[caseId]/call/quiz/page.tsx` (신규) — 마무리 퀴즈 화면. 두 단계로 구성:
+    1. 퀴즈 풀이 화면: A/B/C/D 원형 배지 선택지 + 별도 "정답 제출" 버튼(선택 전 비활성) — `QuizCard`(선택 즉시 채점)와 달리 선택과 제출이 분리된 2단계 인터랙션이라 이 화면 전용으로 새로 구현
+    2. 결과 화면: 선택한 답/정오답 배지/해설/"다시 풀기" + "다음 학습이 궁금하다면?"(`RecommendedCard` 재사용) + 게스트 전용 로그인 유도 배너("간편 로그인 하고 이번 학습을 저장해보세요!" + Kakao 로그인 버튼, 로그인 상태면 미노출) + `BottomNav`
+  - `src/app/learn/[caseId]/call/progress/page.tsx`, `src/app/learn/[caseId]/call/analysis/page.tsx` — "마무리 퀴즈 하러 가기" 버튼을 placeholder(`disabled`)에서 실동작(`ROUTES.callQuiz`로 이동)으로 변경
+- 변경 내용: 시뮬레이션 완료 화면과 AI 분석 결과 화면의 "마무리 퀴즈 하러 가기" 버튼이 실제로 동작하도록 화면을 새로 구현. `call/quiz` 라우트는 `(main)` 그룹 밖에 있어 레이아웃상 `BottomNav`가 자동으로 붙지 않으므로, Figma 디자인대로 페이지에서 직접 `<BottomNav />`를 렌더링함 (통화 시뮬레이션 화면들과 달리 이 화면은 다시 브라우징으로 돌아가는 느낌을 의도한 디자인).
+- 비고: 로그인 상태(`isLoggedIn`)도 `localStorage` 값이라 렌더링 중 바로 읽으면 하이드레이션 에러가 나므로, `AI 분석 결과` 화면에서 겪었던 것과 동일한 패턴(초기값 고정 + `useEffect`에서 읽기)으로 처리. Playwright로 퀴즈 풀이→제출→결과, 다시 풀기, 로그인 클릭 시 배너 숨김, 종료 모달, 두 화면에서의 버튼 연결까지 전부 검증 완료.
+
+## [2026-07-18] 통화중/AI분석 상태 배지 반응형 크기 축소 + 정답 배지 단어 단위 줄바꿈 수정
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — 헤더의 "통화중"/"시뮬레이션 완료" 상태 배지(높이/패딩/점/텍스트)를 고정 크기(`h-8`, `px-4`, `text-sm`)에서 `clamp(min, Ncqw, max)` 기반으로 변경해 좁은 화면에서 더 작게 줄어들도록 함. 완료 화면의 정답/오답 선택 배지와 "선택N" 옆 문항 텍스트에 모두 `break-keep`을 추가해 좁은 화면에서 "확인한다" 같은 단어가 "확인한"/"다."처럼 글자 단위로 끊기던 문제를 단어 단위 줄바꿈으로 수정. 정답/오답 배지 좌우 패딩도 `clamp(12px,4cqw,24px)`로 반응형화. "선택N" 옆 문항 텍스트는 부모(`text-center`)로부터 정렬을 물려받아 문항에 따라 중앙/왼쪽 정렬이 뒤섞여 보이던 문제가 있어, `text-left`를 명시해 항상 왼쪽 정렬되도록 고정.
+  - `src/app/learn/[caseId]/call/analysis/page.tsx` — "AI 분석 결과" 상태 배지도 동일하게 `clamp()` 기반 반응형 크기로 축소.
+- 변경 내용: 실제 스크린샷으로 문제였던 글자 단위 줄바꿈이 단어 단위로 바뀐 것과, 좁은 뷰포트(320px)에서 배지들이 작게 줄어드는 것을 Playwright로 확인. "선택N" 배지와 문항 텍스트를 담은 컨테이너에 `@[450px]:flex-row`(기본은 `flex-col`)를 적용해, 컨테이너 폭 450px 이하에서는 문항 텍스트가 배지 옆이 아니라 배지 아래 줄로 내려가도록 함 — 440px(세로)/460px(가로)에서 `flex-direction` 실측으로 경계값 검증 완료. 완료 화면 문항 카드의 상단 패딩(`pt-8.5` 고정값)도 `clamp(20px, 6cqw, 34px)`로 반응형화 — 320px 컨테이너에서 20px, 500px에서 30px로 스케일링되는 것을 실측 확인.
+
+## [2026-07-18] AI 분석 결과 화면 색상/아이콘 세부 조정
+- 수정/생성 파일: src/app/learn/[caseId]/call/analysis/page.tsx
+- 변경 내용: 헤더의 시나리오 제목 문구 제거, 헤더 상단 아이콘을 `RiShiningFill`에서 `RiShiningLine`으로 변경, "AI 피드백" 옆 아이콘 색상을 `#60A5FA`로, "행동수칙" 옆 아이콘 색상을 `gray-500`으로, "놓친 부분" 카드 테두리 투명도를 50%에서 60%로 변경.
+
+## [2026-07-18] Gemini 모델 폴백 체인 추가 + AI 분석 화면 하이드레이션 버그 수정
+- 수정/생성 파일:
+  - `src/app/api/analyze/route.ts` — 모델을 하나만 호출하던 것을 `MODEL_FALLBACK_CHAIN`(`gemini-flash-latest` → `gemini-2.0-flash` → `gemini-2.0-flash-lite` → `gemini-2.5-flash` → `gemini-2.5-flash-lite` → `gemini-pro-latest`) 순서로 시도하도록 변경. 앞 모델이 할당량 소진(429)이나 서비스 종료(404) 등으로 실패하면 자동으로 다음 모델로 넘어가고, 전부 실패했을 때만 502를 반환한다.
+  - `src/app/learn/[caseId]/call/analysis/page.tsx` — 검증 중 발견한 하이드레이션 에러 수정. `sessionStorage`는 브라우저 전용 API라 서버 렌더 시점엔 항상 비어 있는데, 기존 코드는 `useState(() => readAnalysisInput(caseId))` 형태의 lazy initializer로 렌더링 중 바로 읽어서 초기 `status`(loading/error)가 서버·클라이언트 간 달라져 React 하이드레이션 불일치가 발생했음. `input`/`status`의 초기값을 서버·클라이언트 동일하게(`null`/`"loading"`) 고정하고, 실제 `sessionStorage` 읽기는 마운트 후 effect 안으로 옮겨 해결.
+- 변경 내용: 사용자가 "제미나이 크레딧(할당량) 끝나면 다른 버전으로 이어지게 해달라"고 요청 — 특정 모델이 막혀도 서비스가 끊기지 않도록 자동 폴백을 구현.
+- 비고: 폴백 체인의 각 후보 모델을 실제로 순서대로 실패시켜(존재하지 않는 가짜 모델명 2개 → 마지막에 진짜 모델) 다음 후보로 넘어가는 로직 자체를 검증 완료. `analysis/page.tsx`는 Playwright 콘솔/pageerror 로그로 하이드레이션 에러를 직접 확인한 뒤 수정 — 스타일 변경(색상/아이콘) 작업 중 검증 단계에서 우연히 발견한 기존 버그였음.
+
+## [2026-07-18] /api/analyze 502 에러 수정 — Gemini 모델명 변경
+- 수정/생성 파일: src/app/api/analyze/route.ts
+- 변경 내용: `gemini-2.0-flash` 모델이 이 계정 무료 티어에서 항상 429(`limit: 0`)로 막혀 있던 문제 원인 파악. Google AI Studio 사용량 대시보드 확인 결과 "Gemini 2 Flash" 카테고리 자체가 0/0/0 한도였고, `gemini-2.5-flash`/`gemini-2.5-flash-lite`는 이미 "신규 사용자에게 더 이상 제공되지 않음"(404)으로 막혀 있었음. 실제 사용 가능한 별칭 모델 `gemini-flash-latest`로 전환해 정상 200 응답 확인.
+- 비고: API 키/프로젝트 문제가 아니라 모델 세대 문제였음 — 이후 특정 Gemini 모델이 404/429로 막히면 `GET https://generativelanguage.googleapis.com/v1beta/models?key=...`로 이 키에서 실제 호출 가능한 모델 목록을 먼저 확인할 것.
+
+## [2026-07-18] AI 분석 결과 화면에도 학습 종료 확인 모달 추가
+- 수정/생성 파일: src/app/learn/[caseId]/call/analysis/page.tsx
+- 변경 내용: X 버튼 클릭 시 바로 시나리오 상세로 이동하던 것을, `call/progress` 화면과 동일한 "학습을 종료하시겠습니까?" 확인 모달을 거치도록 변경 ("종료하기" → 시나리오 상세 이동, "계속하기" → 모달만 닫힘).
+
+## [2026-07-18] AI 분석 결과 화면 구현 (Google Gemini 연동)
+- 수정/생성 파일:
+  - `src/app/api/analyze/route.ts` (신규) — Gemini(`gemini-2.0-flash`) 호출, `responseSchema`로 구조화된 JSON 응답 강제
+  - `src/app/learn/[caseId]/call/analysis/page.tsx` (신규) — Figma 디자인(node 43-654) 기반 AI 분석 결과 화면
+  - `src/lib/analysis.ts` (신규) — `saveAnalysisInput`/`readAnalysisInput`, sessionStorage 기반 화면 간 퀴즈 결과 핸드오프
+  - `src/lib/routes.ts` — `ROUTES.callAnalysis` 추가
+  - `src/types/index.ts` — `AnalyzeRequest`, `AiAnalysisResult` 타입 추가
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — "AI 분석 결과 보기" 버튼을 placeholder(`disabled`)에서 실동작으로 변경 (`saveAnalysisInput` 후 `/call/analysis`로 이동)
+  - `.env.local` — `GOOGLE_GEMINI_API_KEY` 항목 추가 (값은 사용자가 Google AI Studio에서 무료 발급 후 직접 입력)
+  - `package.json` — `@google/generative-ai` 의존성 추가
+  - `AGENTS.md` — 실제 네트워크 라우트가 `/api/tts` 하나뿐이라는 서술을 `/api/tts` + `/api/analyze` 두 개로 수정, sessionStorage 핸드오프 패턴 문서화
+- 변경 내용: 전화 시뮬레이션 완료 후 퀴즈 응답을 Gemini에 전달해 AI 피드백(피드백 문장, 반응 속도, 의심도, 좋았던 점, 놓친 부분, 행동수칙)을 생성하고 전용 화면에 렌더링. 정확도(%)는 AI가 아닌 클라이언트에서 퀴즈 정답 여부로 직접 계산해 신뢰성을 보장. sessionStorage에 저장된 입력값이 없는 상태로 화면에 직접 진입하면 시나리오 상세 화면으로 리다이렉트.
+- 비고: React Strict Mode에서 `useEffect`가 두 번 실행되며 `/api/analyze`가 중복 호출되는 버그가 있었음 — 최초 시도(`cancelled` 클로저 변수 + `hasFetchedRef` 병행)는 오히려 로딩 상태에서 멈추는 새로운 버그를 유발했고, `hasFetchedRef` 단독 가드로 교체해 해결(첫 실행에서 시작한 요청 하나만 항상 끝까지 살아남아 상태를 반영하므로 별도 취소 플래그 불필요). Playwright로 요청 1회만 발생, 정확도 계산, 미저장 상태 리다이렉트까지 모두 검증 완료.
+
+## [2026-07-18] AI분석/마무리퀴즈 버튼에도 데스크톱 호버 효과 추가
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: "다시 하기" 버튼에만 있던 데스크톱 호버 효과를 "AI 분석 결과 보기"(호버 시 배경 살짝 밝게), "마무리 퀴즈 하러 가기"(호버 시 `bg-gray-50`)에도 동일하게 추가. `disabled` 버튼이라도 `:hover` 자체는 CSS상 정상 적용됨.
+
+## [2026-07-18] AI분석/마무리퀴즈 버튼 opacity-50이 색을 washed-out으로 만들던 문제 수정
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: "AI 분석 결과 보기"/"마무리 퀴즈 하러 가기" 버튼에 지정한 색(`#1a2035` 등)이 "적용이 안 되는 것 같다"는 피드백 — 실제로는 `opacity-50`(원래 "(준비중)" 문구와 함께 비활성 느낌을 주려던 것)이 색을 흰 배경과 섞어 옅게 보이게 한 것이었음. "(준비중)" 라벨을 이미 제거한 상태라 opacity까지 남아있으면 지정한 색이 그대로 안 보이므로, 두 버튼의 `opacity-50`을 제거해 처음부터 지정한 색이 온전히 보이도록 함.
+- 비고: 버튼은 여전히 `disabled`(클릭 불가) 상태 유지 — 시각적으로만 흐릿하게 보이던 걸 정상 밝기로 되돌린 것.
+
+## [2026-07-18] 마무리 퀴즈 버튼 텍스트 색상 통일
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: "마무리 퀴즈 하러 가기" 버튼 텍스트 색을 `#1a2332`에서 `#1a2035`로 변경 — "AI 분석 결과 보기" 버튼 배경과 동일한 색으로 통일.
+
+## [2026-07-18] 완료 화면 하단 액션 버튼 스타일 정리 (선택카드 정렬 + 다시하기/AI분석/마무리퀴즈)
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용:
+  1. 완료 화면 결과 카드의 "선택N" 칩+질문 텍스트 줄을 가운데 정렬에서 왼쪽 정렬로 변경(`w-full justify-start`) — 선택1/선택2 카드 모두 동일한 좌측 시작 위치를 갖도록 함(카드 패딩이 같으므로 자연히 정렬됨).
+  2. "다시 하기" 버튼: 기본 텍스트 색을 `text-gray-600`→`text-gray-500`으로, 호버 시 `#1a2035`로 변하도록 추가.
+  3. "AI 분석 결과 보기": 아이콘을 `HiSparkles`→`RiShiningLine`으로 교체, "(준비중)" 라벨 제거(배경 `#1a2035`는 기존 유지).
+  4. "마무리 퀴즈 하러 가기": "(준비중)" 라벨 제거, 기존 단색 테두리(`border-[#1a2035]`)를 `#1a2035→#2d1f4e` 그라데이션 테두리로 변경 — 바깥 div에 그라데이션 배경 + `p-[1.5px]` 패딩을 주고 안쪽에 흰 배경 버튼을 얹는 방식으로 구현(CSS는 순수 `border-image` 그라데이션을 `border-radius`와 함께 깔끔히 쓰기 어려워 흔히 쓰는 우회 기법).
+- 비고: 두 버튼 모두 여전히 `disabled` 상태를 유지함 — "(준비중)" 문구만 뺀 것이고 실제 AI 분석/마무리 퀴즈 기능이 생긴 것은 아님(이 프로젝트는 여전히 프론트엔드+목데이터 단계).
+
+## [2026-07-18] 완료 화면 해설 텍스트 왼쪽 정렬
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: 완료 화면 결과 카드의 해설(explanation) 텍스트가 상위 컨테이너의 `text-center` 상속으로 가운데 정렬되어 있던 것을 `text-left`로 명시해 왼쪽 정렬로 변경.
+
+## [2026-07-18] 완료 화면 결과 배지 아이콘·텍스트 세로 정렬 수정
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: 완료 화면의 정답/오답 배지에서 아이콘(`RiCheckboxCircleFill`/`MdCancel`)과 선택지 텍스트가 미묘하게 세로로 어긋나 보이던 문제 수정 — 텍스트를 `<span className="leading-none">`으로 감싸 line-height로 인한 정렬 오차를 제거함 (기존 학습기록 페이지의 배지 정렬 패턴과 동일).
+- 비고: 같은 세션에서 `runDialogue` useEffect의 `eslint-disable-next-line react-hooks/exhaustive-deps` 주석이 파일 수정 과정 중 유실되어 lint 경고가 났던 것도 함께 복원함.
+
+## [2026-07-18] 정답/오답 아이콘을 원형 채움 아이콘으로 교체
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: 퀴즈 선택지와 완료 화면 결과 카드에서 정답/오답을 나타내던 `IoCheckmark`/`IoClose`(테두리 없는 단순 체크·X)를 `RiCheckboxCircleFill`/`MdCancel`(배경까지 채워진 원형 체크·X)로 교체.
+
+## [2026-07-18] 통화 진행 화면 세부 간격 미세조정 (헤더/퀴즈카드/완료화면 카드)
+- 수정/생성 파일: src/app/learn/[caseId]/call/progress/page.tsx
+- 변경 내용: 헤더 상단 패딩 27px 고정, X·음소거 버튼 상단 위치를 20px→21px로 조정해 배지와의 간격을 6px로 맞춤. 배지↔시나리오 제목 간격과 제목↔웨이브폼 간격은 기존 `clamp(10px,3cqh,15px)`을 유지하되, "올바른 대응" 통계 텍스트만 별도로 5px 간격으로 분리(기존엔 컨테이너 `gap`으로 셋이 같은 간격을 공유했음 — `gap` 대신 각 자식에 개별 `marginTop`을 주는 방식으로 구조 변경). 퀴즈 카드 바깥 여백을 위 14px/양옆 17px로, 완료 화면의 문항별 결과 카드 패딩을 위 34px/양옆 25px로 조정.
+
 ## [2026-07-18] 첫 대사 TTS 프리페치로 체감 속도 개선 + 말하는 대사 텍스트 색상 복원 + 종료 모달 반응형
 - 수정/생성 파일: src/lib/tts.ts, src/app/learn/[caseId]/call/page.tsx, src/app/learn/[caseId]/call/progress/page.tsx
 - 변경 내용:

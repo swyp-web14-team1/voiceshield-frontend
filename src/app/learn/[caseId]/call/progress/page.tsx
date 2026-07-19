@@ -3,15 +3,18 @@
 import { use, useEffect, useRef, useState } from "react";
 import { useRouter, notFound } from "next/navigation";
 import { FiX } from "react-icons/fi";
-import { MdOutlineReplay } from "react-icons/md";
+import { MdOutlineReplay, MdCancel } from "react-icons/md";
 import { BsFillPersonFill } from "react-icons/bs";
-import { IoVolumeMute, IoVolumeHigh, IoCheckmark, IoClose } from "react-icons/io5";
-import { HiSparkles } from "react-icons/hi2";
-import { getCaseById } from "@/lib/mock-cases";
+import { IoVolumeMute, IoVolumeHigh } from "react-icons/io5";
+import { RiCheckboxCircleFill, RiShiningLine } from "react-icons/ri";
+import { getCaseById, CASE_CATEGORY_LABEL } from "@/lib/mock-cases";
 import { ROUTES } from "@/lib/routes";
 import { getStoredTtsPreference, prefetchTts } from "@/lib/tts";
 import { WAVEFORM_BAR_PATHS } from "@/lib/waveform-bars";
-import type { QuizQuestion } from "@/types";
+import { saveAnalysisInput } from "@/lib/analysis";
+import { recordCaseProgress } from "@/lib/progress";
+import { QuizCard } from "@/components/learn/QuizCard";
+import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
 
 type Phase = "dialogue" | "quiz" | "complete";
 
@@ -48,73 +51,6 @@ function CallWaveform({ active }: { active: boolean }) {
   );
 }
 
-function QuizCard({
-  question,
-  selected,
-  onSelect,
-}: {
-  question: QuizQuestion;
-  selected: number | null;
-  onSelect: (choiceIndex: number) => void;
-}) {
-  return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-[0px_1px_3px_rgba(0,0,0,0.1)]">
-      <div
-        className="break-keep text-center text-sm font-bold text-white"
-        style={{
-          backgroundImage: HEADER_GRADIENT,
-          paddingInline: "clamp(12px, 5cqw, 16px)",
-          paddingBlock: "clamp(7px, 2.5cqh, 10px)",
-        }}
-      >
-        {question.question}
-      </div>
-      <div
-        className="flex flex-col"
-        style={{
-          gap: "clamp(6px, 2cqh, 8px)",
-          paddingInline: "clamp(16px, 7cqw, 26px)",
-          paddingTop: "clamp(12px, 4cqh, 18px)",
-          paddingBottom: "clamp(10px, 3.5cqh, 16px)",
-        }}
-      >
-        {question.choices.map((choice, i) => {
-          const isSelected = selected === i;
-          const isCorrectChoice = i === question.answerIndex;
-          const isCorrectAndSelected = isSelected && isCorrectChoice;
-          const isWrongAndSelected = isSelected && !isCorrectChoice;
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={selected !== null}
-              onClick={() => onSelect(i)}
-              style={{
-                paddingInline: "clamp(10px, 4cqw, 14px)",
-                paddingBlock: "clamp(8px, 2.8cqh, 12px)",
-                ...(isCorrectAndSelected ? { backgroundImage: HEADER_GRADIENT } : undefined),
-              }}
-              className={`flex items-center justify-between gap-2 rounded-lg border text-left text-sm font-medium transition-colors ${
-                isCorrectAndSelected
-                  ? "border-transparent text-white"
-                  : isWrongAndSelected
-                    ? "border-gray-400 bg-gray-300 text-[#1a2332]"
-                    : "border-gray-300 bg-gray-100 text-[#1a2332]"
-              } ${selected === null ? "cursor-pointer [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-200" : "cursor-default"}`}
-            >
-              <span className="flex items-start gap-2">
-                <span className="shrink-0 font-bold">{i + 1}.</span>
-                <span>{choice}</span>
-              </span>
-              {isCorrectAndSelected && <IoCheckmark size={18} className="shrink-0" />}
-              {isWrongAndSelected && <IoClose size={18} className="shrink-0" />}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export default function CallSimulationProgressPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
@@ -134,6 +70,10 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
   const playTokenRef = useRef(0);
   const lineRefs = useRef<Array<HTMLDivElement | null>>([]);
   const dialogueScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    recordCaseProgress(caseId, phase);
+  }, [caseId, phase]);
 
   useEffect(() => {
     mutedRef.current = muted;
@@ -166,16 +106,13 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
     container.scrollTo({ top: offset, behavior: "smooth" });
   };
 
-  // 퀴즈 카드가 처음 나타나 대화 영역 높이가 줄어드는 순간에는, 그 전에 대사가 끝나며 시도했던
-  // 스크롤이 아직 스크롤할 내용이 없어 무시됐을 수 있다 — 카드가 뜬 직후 마지막 대사를 다시 맨 위로 올린다.
+
   useEffect(() => {
     if (phase !== "quiz" || lastCallerIndex < 0) return;
     const raf = requestAnimationFrame(() => scrollLineToTop(lastCallerIndex));
     return () => cancelAnimationFrame(raf);
   }, [phase, lastCallerIndex]);
 
-  // playTokenRef로 자기 자신보다 나중에 시작된 재생 요청이 있으면 스스로를 무효화한다.
-  // (React Strict Mode의 effect 이중 실행 등으로 같은 대사가 두 번 재생되어 겹쳐 들리는 문제 방지)
   const playLine = async (index: number, text: string) => {
     const token = ++playTokenRef.current;
     if (mutedRef.current) return;
@@ -188,7 +125,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
 
     try {
       const { voice, rate } = getStoredTtsPreference();
-      // 수신 전화 화면에서 미리 요청해둔 첫 대사가 있으면 그걸 그대로 이어받아 재생까지의 지연을 줄인다.
+
       const blob = await prefetchTts(text, voice, rate);
       url = URL.createObjectURL(blob);
       if (token !== playTokenRef.current) throw new Error("superseded");
@@ -199,16 +136,14 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       const ended = new Promise<void>((resolve) => {
         currentAudio.onended = () => resolve();
         currentAudio.onerror = () => resolve();
-        // 음소거 등으로 재생이 중간에 멈춘(pause) 경우에도 재생이 끝난 것으로 취급해,
-        // 다음 대사로 넘어가지 못하고 멈춰버리는 일이 없게 한다.
+
         currentAudio.onpause = () => resolve();
       });
       await audio.play();
       if (token !== playTokenRef.current) throw new Error("superseded");
       await ended;
     } catch {
-      // 클라우드 음성 재생이 (자동재생 차단 등으로) 실패한 경로로 들어온 경우, 시도했던 오디오
-      // 엘리먼트를 완전히 멈춰서 나중에 뒤늦게 재생되며 브라우저 TTS 폴백과 겹쳐 들리는 일이 없게 한다.
+
       if (audio) {
         audio.pause();
         audio.src = "";
@@ -230,7 +165,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       if (url) URL.revokeObjectURL(url);
       if (token === playTokenRef.current) {
         setPlayingLineIndex(null);
-        // 말이 끝난 대사가 화면 위쪽으로 올라오도록 스크롤해, 다음 내용을 보기 위해 수동으로 스크롤할 필요가 없게 한다.
+
         scrollLineToTop(index);
       }
     }
@@ -286,8 +221,8 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       osc.stop(now + start + duration);
     };
 
-    playNote(1318.51, 0, 0.5, 0.25); // 띵
-    playNote(1046.5, 0.15, 0.6, 0.22); // 동
+    playNote(1318.51, 0, 0.5, 0.25); 
+    playNote(1046.5, 0.15, 0.6, 0.22); 
     setTimeout(() => ctx.close(), 900);
   };
 
@@ -307,7 +242,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
 
     const osc = ctx.createOscillator();
     osc.type = "triangle";
-    osc.frequency.value = 880; // 땡
+    osc.frequency.value = 880;
     osc.connect(gain);
     osc.start(now);
     osc.stop(now + 0.45);
@@ -349,7 +284,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
         className="relative shrink-0 px-4 text-white shadow-[0px_1px_3px_rgba(0,0,0,0.1)]"
         style={{
           backgroundImage: HEADER_GRADIENT,
-          paddingTop: "clamp(16px, 5cqh, 21px)",
+          paddingTop: "27px",
           paddingBottom: phase === "complete" ? "clamp(14px, 4cqh, 20px)" : "clamp(24px, 7cqh, 34px)",
         }}
       >
@@ -376,37 +311,46 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
           </button>
         )}
 
-        <div className="flex flex-col items-center" style={{ gap: "clamp(10px, 3cqh, 15px)" }}>
+        <div className="flex flex-col items-center">
           <div
-            className={`flex h-8 items-center gap-1.5 rounded-full border-[1.5px] px-4 ${
+            className={`flex h-[clamp(24px,6.5cqw,30px)] items-center gap-1.5 rounded-full border-[1.5px] px-[clamp(10px,3cqw,14px)] ${
               phase === "complete" ? "border-[#60a5fa]/30 bg-[#60a5fa]/10" : "border-[#df1e21]/30 bg-[#df1e21]/10"
             }`}
           >
-            <span className={`size-1.5 rounded-full ${phase === "complete" ? "bg-[#60a5fa]" : "animate-pulse bg-[#df1e21]"}`} />
-            <span className={`text-sm font-semibold ${phase === "complete" ? "text-[#60a5fa]" : "text-[#df1e21]"}`}>
+            <span
+              className={`size-[clamp(4px,1.2cqw,6px)] rounded-full ${phase === "complete" ? "bg-[#60a5fa]" : "animate-pulse bg-[#df1e21]"}`}
+            />
+            <span
+              className={`text-[clamp(11px,3cqw,13px)] font-semibold ${phase === "complete" ? "text-[#60a5fa]" : "text-[#df1e21]"}`}
+            >
               {phase === "complete" ? "시뮬레이션 완료" : "통화중"}
             </span>
           </div>
 
-          <p className="text-center font-extrabold" style={{ fontSize: "clamp(15px, 4.2cqw, 18px)" }}>
+          <p
+            className="text-center font-extrabold"
+            style={{ fontSize: "clamp(15px, 4.2cqw, 18px)", marginTop: "clamp(10px, 3cqh, 15px)" }}
+          >
             시나리오 : {phishingCase.title}
           </p>
 
           {phase === "complete" ? (
-            <p className="text-sm font-bold">
+            <p className="text-sm font-medium" style={{ marginTop: "5px" }}>
               올바른 대응 <span className="text-[#60a5fa]">{correctCount}</span>
               <span className="text-white/50"> / {phishingCase.quiz.length}회</span>
             </p>
           ) : (
-            <CallWaveform active={playingLineIndex !== null} />
+            <div style={{ marginTop: "clamp(10px, 3cqh, 15px)" }}>
+              <CallWaveform active={playingLineIndex !== null} />
+            </div>
           )}
         </div>
       </div>
 
       {phase !== "complete" ? (
         <>
-          <div ref={dialogueScrollRef} className="no-scrollbar flex-1 overflow-y-auto">
-            <div className="flex flex-col gap-5 px-9.5 py-5">
+          <div key="dialogue" ref={dialogueScrollRef} className="no-scrollbar flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-5 px-[clamp(16px,8cqw,32px)] py-5">
               {phishingCase.phoneDialogue.slice(0, revealedCount).map((line, i) => {
                 const isSpeaking = playingLineIndex === i;
                 return line.speaker === "caller" ? (
@@ -457,40 +401,48 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
           </div>
 
           {phase === "quiz" && currentQuestion && (
-            <div className="shrink-0 px-[18px] pb-[15px]">
+            <div className="shrink-0 px-4.25 pt-3.5 pb-3.75">
               <QuizCard question={currentQuestion} selected={answers[quizIndex]} onSelect={handleSelect} />
             </div>
           )}
         </>
       ) : (
         <>
-          <div className="no-scrollbar flex-1 overflow-y-auto">
-            <div className="flex flex-col gap-3.5 px-4 py-5">
+          <div key="complete" className="no-scrollbar flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-3.5 px-4.25 py-3.5">
               {phishingCase.quiz.map((q, i) => {
                 const chosen = answers[i];
                 const isCorrect = chosen === q.answerIndex;
                 return (
-                  <div key={q.id} className="rounded-xl bg-white p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
+                  <div
+                    key={q.id}
+                    className="rounded-xl bg-white px-6.25 pb-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
+                    style={{ paddingTop: "clamp(20px, 6cqw, 34px)" }}
+                  >
                     <div className="flex flex-col items-center gap-3.5 text-center">
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <span className="flex h-5.5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#1a2332] px-2.5 text-xs font-bold text-[#1a2332]">
+                      <div className="flex w-full items-start gap-2">
+                        <span className="flex h-[clamp(20px,5.5cqw,22px)] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#1a2332] px-[clamp(6px,2cqw,8px)] text-[clamp(10px,2.8cqw,12px)] font-bold text-[#1a2332]">
                           선택{i + 1}
                         </span>
-                        <p className="text-sm font-semibold text-[#1a2332]">{q.question}</p>
+                        <p className="break-keep text-left text-sm font-semibold text-[#1a2332]">{q.question}</p>
                       </div>
                       <div
-                        className={`flex items-center gap-1.5 rounded-lg px-6 py-2 text-xs font-bold text-white ${
+                        className={`flex items-center gap-1.5 rounded-lg px-[clamp(12px,4cqw,24px)] py-2 text-left text-xs font-semibold text-white ${
                           isCorrect ? "bg-[#00bc7d]" : "bg-[#df1e21]"
                         }`}
                       >
-                        {isCorrect ? <IoCheckmark size={16} /> : <IoClose size={16} />}
-                        {chosen !== null ? q.choices[chosen] : "선택하지 않음"}
+                        {isCorrect ? (
+                          <RiCheckboxCircleFill size={18} className="shrink-0" />
+                        ) : (
+                          <MdCancel size={18} className="shrink-0" />
+                        )}
+                        <span className="break-keep leading-tight">{chosen !== null ? q.choices[chosen] : "선택하지 않음"}</span>
                       </div>
                       <p className={`text-sm font-bold ${isCorrect ? "text-[#00bc7d]" : "text-[#df1e21]"}`}>
                         {isCorrect ? "정확합니다!" : "위험합니다"}
                       </p>
                       <div className="rounded-xl bg-gray-100 px-3.5 py-2.5">
-                        <p className="text-xs leading-relaxed text-gray-700">{q.explanation}</p>
+                        <p className="text-left text-xs leading-relaxed text-gray-700">{q.explanation}</p>
                       </div>
                     </div>
                   </div>
@@ -503,81 +455,50 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
             <button
               type="button"
               onClick={handleRestart}
-              className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-gray-300 text-sm font-bold text-gray-600 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50"
+              className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-gray-300 text-sm font-semibold text-gray-500 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50 [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#1a2035]"
             >
               <MdOutlineReplay size={16} />
               다시 하기
             </button>
             <button
               type="button"
-              disabled
-              className="flex h-11 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-[#1a2035] text-sm font-bold text-white opacity-50"
+              onClick={() => {
+                saveAnalysisInput(caseId, {
+                  caseTitle: phishingCase.title,
+                  category: CASE_CATEGORY_LABEL[phishingCase.category],
+                  quiz: phishingCase.quiz,
+                  answers,
+                });
+                router.push(ROUTES.callAnalysis(caseId));
+              }}
+              className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#1a2035] text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#212841]"
             >
-              <HiSparkles size={15} />
-              AI 분석 결과 보기 (준비중)
+              <RiShiningLine size={15} />
+              AI 분석 결과 보기
             </button>
-            <button
-              type="button"
-              disabled
-              className="flex h-11 cursor-not-allowed items-center justify-center rounded-lg border border-[#1a2035] text-sm font-semibold text-[#1a2332] opacity-50"
-            >
-              마무리 퀴즈 하러 가기 (준비중)
-            </button>
+            <div className="rounded-lg p-[1.5px]" style={{ backgroundImage: HEADER_GRADIENT }}>
+              <button
+                type="button"
+                onClick={() => router.push(ROUTES.callQuiz(caseId))}
+                className="flex h-10.25 w-full cursor-pointer items-center justify-center rounded-[7px] bg-white text-sm font-semibold text-[#1a2035] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50"
+              >
+                마무리 퀴즈 하러 가기
+              </button>
+            </div>
           </div>
         </>
       )}
 
-      {showExitModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          style={{ padding: "clamp(20px, 8cqw, 40px)" }}
-          onClick={() => setShowExitModal(false)}
-        >
-          <div
-            className="flex w-full flex-col items-center justify-center rounded-xl bg-white shadow-[0px_1px_3px_rgba(0,0,0,0.1)]"
-            style={{
-              maxWidth: "clamp(280px, 90cqw, 360px)",
-              height: "clamp(160px, 60cqw, 206px)",
-              padding: "clamp(18px, 7cqw, 26px) clamp(20px, 8cqw, 40px)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-col items-center gap-4 text-center">
-              <div className="flex flex-col gap-2">
-                <p className="font-bold text-[#1a2332]" style={{ fontSize: "clamp(17px, 5.5cqw, 22px)" }}>
-                  학습을 종료하시겠습니까?
-                </p>
-                <p className="text-sm leading-relaxed text-gray-600">
-                  현재 진행 중인 시뮬레이션은 종료되며, 다음에 다시 시작할 경우 처음부터 진행됩니다.
-                </p>
-              </div>
-              <div className="flex w-full gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    playTokenRef.current++;
-                    audioRef.current?.pause();
-                    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
-                    router.push(ROUTES.scenario(caseId));
-                  }}
-                  className="flex flex-1 cursor-pointer items-center justify-center rounded-lg bg-white text-sm font-bold text-gray-700 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50"
-                  style={{ height: "clamp(36px, 12cqw, 44px)" }}
-                >
-                  종료하기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowExitModal(false)}
-                  className="flex flex-1 cursor-pointer items-center justify-center rounded-lg bg-gray-700 text-sm font-bold text-white shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-800"
-                  style={{ height: "clamp(36px, 12cqw, 44px)" }}
-                >
-                  계속하기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExitConfirmModal
+        open={showExitModal}
+        onExit={() => {
+          playTokenRef.current++;
+          audioRef.current?.pause();
+          if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+          router.push(ROUTES.scenario(caseId));
+        }}
+        onCancel={() => setShowExitModal(false)}
+      />
     </div>
   );
 }

@@ -11,6 +11,8 @@ export const ROUTES = {
   scenario: (caseId: string) => `/learn/${caseId}`, // US-03 학습 시나리오 상세
   call: (caseId: string) => `/learn/${caseId}/call`, // US-03 전화 시뮬레이션(수신 전화 화면)
   callProgress: (caseId: string) => `/learn/${caseId}/call/progress`, // US-03 전화 시뮬레이션(통화 진행/퀴즈/완료 화면)
+  callAnalysis: (caseId: string) => `/learn/${caseId}/call/analysis`, // US-03 전화 시뮬레이션(AI 분석 결과 화면)
+  callQuiz: (caseId: string) => `/learn/${caseId}/call/quiz`, // US-03 전화 시뮬레이션(마무리 퀴즈 화면)
 
   record: "/record", // US-04~08 학습 기록
 

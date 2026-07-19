@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiBookOpen } from "react-icons/fi";
 import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
@@ -12,7 +15,11 @@ import { DIFFICULTY_META } from "@/lib/case-meta";
 import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
 import { RecommendedCard } from "@/components/cards/RecommendedCard";
 import { ROUTES } from "@/lib/routes";
+import { applyProgressOverride, readProgressSnapshot, type ProgressSnapshot } from "@/lib/progress";
 import type { CaseCategory } from "@/types";
+
+const DEFAULT_CONTINUE_CASE_ID = "institution-01";
+const EMPTY_PROGRESS_SNAPSHOT: ProgressSnapshot = { recentInProgressCaseId: null, overrides: {} };
 
 const DEFAULT_ICON_SIZE = "clamp(14px, 4cqw, 20px)";
 
@@ -34,7 +41,17 @@ const RECOMMENDED_CASES = [...MOCK_CASES].sort((a, b) => b.recommendation - a.re
 
 
 export default function HomePage() {
-  const continueCase = getCaseById("institution-01")!;
+  // localStorage 기반 진행 기록은 서버에서 읽을 수 없으므로, 초기값은 서버·클라이언트 동일하게 빈 스냅샷으로 고정하고
+  // 실제 값은 마운트 후 useEffect에서 읽는다 (하이드레이션 불일치 방지).
+  const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
+    setProgress(readProgressSnapshot());
+  }, []);
+
+  const continueCaseId = progress.recentInProgressCaseId ?? DEFAULT_CONTINUE_CASE_ID;
+  const continueCase = applyProgressOverride(getCaseById(continueCaseId)!, progress);
 
   return (
     <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3.5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">

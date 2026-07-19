@@ -41,8 +41,8 @@ export function CategoryTagRow({ value, onChange }: CategoryTagRowProps) {
   return (
     <div
       ref={tagRowRef}
-      className="no-scrollbar -my-1 flex cursor-pointer gap-2.5 overflow-x-auto py-1"
-      style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}
+      className="no-scrollbar -my-1 flex cursor-pointer overflow-x-auto py-1"
+      style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch", gap: "clamp(5px, 1.8cqw, 10px)" }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={endDrag}
@@ -52,9 +52,10 @@ export function CategoryTagRow({ value, onChange }: CategoryTagRowProps) {
       <button
         type="button"
         onClick={() => onChange("all")}
-        className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium whitespace-nowrap ${
+        className={`shrink-0 rounded-full text-[clamp(12px,3.2cqw,14px)] font-medium whitespace-nowrap ${
           value === "all" ? "bg-gray-600 text-white" : "bg-white text-gray-600 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
         }`}
+        style={{ paddingInline: "clamp(12px, 4cqw, 16px)", paddingBlock: "clamp(4px, 1cqw, 6px)" }}
       >
         전체
       </button>
@@ -63,9 +64,10 @@ export function CategoryTagRow({ value, onChange }: CategoryTagRowProps) {
           key={key}
           type="button"
           onClick={() => onChange(key)}
-          className={`shrink-0 rounded-full px-4 py-1 text-sm font-semibold whitespace-nowrap ${
+          className={`shrink-0 rounded-full text-[clamp(12px,3.2cqw,14px)] font-semibold whitespace-nowrap ${
             value === key ? "bg-gray-600 text-white" : "bg-white text-gray-600 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
           }`}
+          style={{ paddingInline: "clamp(12px, 4cqw, 16px)", paddingBlock: "clamp(3px, 1.3cqw, 4px)" }}
         >
           {CATEGORY_META[key].label}
         </button>

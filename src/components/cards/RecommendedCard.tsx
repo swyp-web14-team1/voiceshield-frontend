@@ -41,7 +41,7 @@ export function RecommendedCard({ href, phishingCase }: RecommendedCardProps) {
       </div>
       <Link
         href={href}
-        className="flex shrink-0 items-center gap-0.5 rounded-full bg-[#2563eb] py-1.5 pr-2 pl-3 text-xs font-semibold text-white shadow-[0px_1px_1px_rgba(0,0,0,0.1)] transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#1d4fd1]"
+        className="flex shrink-0 items-center gap-0.5 rounded-full bg-[#2563eb] py-1.5 pr-2 pl-3 text-xs leading-none font-medium text-white shadow-[0px_1px_1px_rgba(0,0,0,0.1)] transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#1d4fd1]"
       >
         학습하기
         <FiChevronRight size={14} />

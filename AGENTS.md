@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # 보이스쉴드 (VoiceShield) 프로젝트
 
-보이스피싱 예방 교육을 위한 Next.js PWA. 실제 시나리오 학습, 긴급 신고 안내, TTS 기반 음성 시뮬레이션을 제공한다. 현재 **프론트엔드 + 목데이터** 단계이며, 실제 백엔드 API는 없다 — `POST /api/tts`만 실제 외부 서비스(Google Cloud TTS)와 통신하고, 나머지는 전부 목데이터 또는 `localStorage`로 동작한다.
+보이스피싱 예방 교육을 위한 Next.js PWA. 실제 시나리오 학습, 긴급 신고 안내, TTS 기반 음성 시뮬레이션, AI 기반 학습 결과 분석을 제공한다. 현재 **프론트엔드 + 목데이터** 단계이며, 별도의 자체 백엔드 서버/DB는 없다 — `POST /api/tts`(Google Cloud TTS), `POST /api/analyze`(Google Gemini) 두 라우트만 실제 외부 서비스와 통신하고, 나머지는 전부 목데이터 또는 `localStorage`/`sessionStorage`로 동작한다.
 
 ## 기술 스택
 
@@ -16,6 +16,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Styling**: Tailwind CSS v4
 - **Icons**: react-icons v5
 - **TTS**: `@google-cloud/text-to-speech` (서버 API 라우트 경유) — 실패 시 브라우저 `speechSynthesis`(Web Speech API)로 자동 폴백
+- **AI 분석**: `@google/generative-ai` (Gemini, 서버 API 라우트 경유) — 시뮬레이션 완료 후 학습자 응답을 분석해 피드백 생성
 - **Package manager**: npm
 
 ## 폴더 구조 규칙
@@ -27,12 +28,15 @@ src/
     layout.tsx              # 루트 레이아웃 — FontScaleProvider, FOUC 방지 inline script
     globals.css              # 디자인 토큰(--text-*, --font-scale), 전역 규칙(cursor, user-select 등)
     api/
-      tts/route.ts           # 유일하게 실제 네트워크 통신이 있는 라우트 (Google Cloud TTS)
+      tts/route.ts           # 실제 네트워크 통신 라우트 (Google Cloud TTS)
+      analyze/route.ts       # 실제 네트워크 통신 라우트 (Google Gemini, 학습 결과 AI 분석)
     (main)/                  # 로그인 이후 라우트 그룹 — layout.tsx에서 BottomNav 렌더
       home/page.tsx          # US-02 메인 화면
       learn/
         page.tsx             # US-03 학습하기 (카테고리 필터, useSearchParams → 반드시 Suspense로 감쌀 것)
         [caseId]/page.tsx    # US-03 학습 시나리오 상세
+        [caseId]/call/analysis/page.tsx  # US-03 전화 시뮬레이션 완료 후 AI 분석 결과 화면
+        [caseId]/call/quiz/page.tsx      # US-03 마무리 퀴즈 (같은 시나리오의 다른 문항, 결과 화면에 추천학습·게스트 로그인 유도 배너 포함)
       emergency/page.tsx     # US-09 긴급 신고 안내
       settings/
         page.tsx             # US-10 설정
@@ -40,15 +44,18 @@ src/
   components/
     layout/                  # BackHeader(모든 하위 페이지 공통 뒤로가기 헤더), BottomNav
     cards/                   # ScenarioCard, ContinueLearningCard, RecommendedCard, CaseStatsGrid
-    learn/                   # CategoryTagRow 등 학습 페이지 전용 컴포넌트
+    learn/                   # CategoryTagRow, QuizCard(전화 시뮬레이션 중 판단 퀴즈 — 선택 즉시 정답/오답 표시), ExitConfirmModal(통화 시뮬레이션 3화면 공용 "학습을 종료하시겠습니까?" 모달) 등 학습 페이지 전용 컴포넌트
     icons/                   # home-icons.tsx, kakao-icons.tsx 등 커스텀 SVG 아이콘
     providers/               # FontScaleProvider — localStorage 기반 전역 글자 크기 배율
   lib/
     routes.ts                # 전체 라우트 상수(US ID 주석 포함) — 경로는 항상 여기서 가져다 쓸 것
-    mock-cases.ts             # PhishingCase 목데이터 (실제 DB 없음, 여기가 유일한 소스)
+    mock-cases.ts             # PhishingCase 목데이터 (실제 DB 없음, 여기가 유일한 소스). 각 케이스는 `quiz`(전화 시뮬레이션 중 판단 퀴즈, 2문항)와 `finalQuiz`(마무리 퀴즈, 같은 주제의 다른 문항 1개)를 모두 가진다 — 새 케이스 추가 시 둘 다 채울 것
     case-meta.ts               # 카테고리/난이도 라벨·색상 매핑 (CATEGORY_META, DIFFICULTY_META)
     auth.ts                   # AUTH_STORAGE_KEY — localStorage 기반 mock 로그인 플래그
-  types/index.ts               # 전역 타입 (PhishingCase, CaseCategory, CaseDifficulty 등)
+    sound.ts                   # playFeedbackTone — 퀴즈 정답/오답 효과음. 음원 파일 없이 Web Audio API 오실레이터로 합성 (QuizCard, 마무리 퀴즈 공용)
+    analysis.ts                # sessionStorage 기반 AI 분석 입력값 저장/조회 (call/progress → call/analysis 화면 간 데이터 전달)
+    progress.ts                 # localStorage 기반 케이스별 실제 학습 진행률 추적 (voiceshield-case-progress). `recordCaseProgress`로 call/progress·call/quiz에서 단계 진입 시 기록(dialogue 30%→quiz 60%→complete 90%→finalQuiz 100%+완료 처리), `recordAnalysisAccuracy`로 call/analysis에서 AI 분석 완료 시 퀴즈 정답률을 기록. `applyProgressOverride`(All)로 mock-cases.ts의 정적 completionRate/isCompleted를 실제 값으로 덮어씀. 홈/학습하기 화면의 "이어서 학습하기"·"최근 학습한 사례", 기록 화면의 전체 진행률/최근 진행한 학습이 모두 이 기록 기준으로 계산됨. 기록 화면의 "취약 유형"은 AI 분석을 본 적 있는 카테고리는 그 정답률(accuracy, <70이면 취약)로, 아직 분석을 안 본 카테고리는 completionRate(<50이면 취약)로 판단.
+  types/index.ts               # 전역 타입 (PhishingCase, CaseCategory, CaseDifficulty, AnalyzeRequest, AiAnalysisResult 등)
 public/
   manifest.json, logo.svg, learn-*.png/svg 등 PWA·정적 에셋
 ```
@@ -56,13 +63,15 @@ public/
 ## 개발 원칙
 
 ### 백엔드 연결 대비 (현재는 없음)
-- 실제 네트워크 호출은 `/api/tts` 하나뿐이다. 그 외 시나리오 데이터, 로그인 상태, 알림 설정, 글자 크기 등은 전부 `lib/mock-cases.ts` 또는 `localStorage`로 관리된다.
+- 실제 네트워크 호출은 `/api/tts`, `/api/analyze` 둘뿐이다. 그 외 시나리오 데이터, 로그인 상태, 알림 설정, 글자 크기 등은 전부 `lib/mock-cases.ts` 또는 `localStorage`로 관리된다.
+- 라우트 간에 복잡한 구조화 데이터(예: 퀴즈 응답)를 넘겨야 할 때는 URL 쿼리스트링 대신 `sessionStorage`(캐시ID로 키를 구분)로 핸드오프한다 — `lib/analysis.ts`의 `saveAnalysisInput`/`readAnalysisInput` 패턴 참고. 저장된 값이 없으면(직접 URL 진입 등) 해당 화면은 이전 단계로 리다이렉트한다.
 - 로그인/게스트 구분은 진짜 인증이 아니라 `lib/auth.ts`의 `AUTH_STORAGE_KEY`(`voiceshield-logged-in`) localStorage 플래그로만 판단한다. 백엔드가 붙기 전까지 이 패턴을 유지한다.
 - 새 설정값을 추가할 때는 기존 localStorage 키 네이밍 규칙(`voiceshield-<feature>`, 예: `voiceshield-reminder-on`, `voiceshield-font-size`)을 따른다.
 
 ### 스타일링
 - Tailwind CSS v4, 클래스 기반 스타일링만 사용한다.
-- 반응형은 미디어쿼리 브레이크포인트보다 **컨테이너 쿼리 기반 `clamp(min, Ncqw, max)` 패턴을 우선 사용**한다 (`<body>`에 `@container` 적용됨, 예: `w-[clamp(50px,25cqw,100px)]`).
+- 반응형은 미디어쿼리 브레이크포인트보다 **컨테이너 쿼리 기반 `clamp(min, Ncqw, max)` 패턴을 우선 사용**한다 (`<body>`에 `@container` 적용됨, 예: `w-[clamp(50px,25cqw,100px)]`). 크기 조절이 아니라 특정 컨테이너 폭 기준으로 레이아웃 자체(`flex-row`↔`flex-col` 등)를 바꿔야 할 때는 `@[Npx]:` 형태의 임의값 컨테이너 쿼리 variant를 사용한다 (예: `flex-col @[450px]:flex-row` — 기본은 세로 배치, 컨테이너 폭이 450px 초과하면 가로 배치. `BottomNav`의 `@max-[410px]:px-7`도 같은 패턴).
+- 한글 텍스트가 좁은 화면에서 단어 중간이 아니라 단어 단위로 줄바꿈되어야 하면 `break-keep`(= `word-break: keep-all`)을 명시한다. 지정하지 않으면 기본 CJK 줄바꿈 규칙 때문에 "확인한다"가 "확인한"/"다."처럼 음절 단위로 끊길 수 있다.
 - 텍스트 크기는 `globals.css`의 `--text-*`(xs/sm/base/xl/3xl) 토큰을 사용한다 — 전부 `calc(var(--font-scale, 1) * clamp(...))`로 감싸져 있어 설정 페이지의 "글자 크기 조정" 기능과 자동 연동된다. 임의 px보다 이 토큰을 우선 사용할 것.
 - 카테고리/난이도 색상은 `lib/case-meta.ts`(`CATEGORY_META`, `DIFFICULTY_META`)가 유일한 출처다. 페이지마다 색상을 새로 정의하지 않는다.
 - `overflow-hidden` + 절대 위치 자식 조합은 Chromium에서 부모 높이가 찌그러지는 버그가 있다 — hover 등 시각 효과는 `box-shadow: inset 0 0 0 999px rgba(...)` 방식을 우선 사용한다.
@@ -77,6 +86,7 @@ public/
 - 별도 상태관리 라이브러리 없이 **React Context + localStorage** 패턴을 사용한다. `FontScaleProvider`가 표준 예시: Context로 값 제공 + localStorage로 영속 + `layout.tsx`의 동기 inline `<script>`로 FOUC 방지.
 - 새 전역 설정에서 FOUC(깜빡임)가 문제되면 `FontScaleProvider`의 패턴(마운트 전 inline script + `suppressHydrationWarning`)을 따른다.
 - localStorage 값을 useEffect로 "읽기"와 "쓰기"를 분리하면 마운트 시점에 레이스 컨디션이 생길 수 있다 (읽기 effect의 상태 업데이트가 반영되기 전에 쓰기 effect가 구값으로 덮어씀). 쓰기는 상태를 변경하는 이벤트 핸들러 안에서 직접 수행한다.
+- `localStorage`/`sessionStorage` 값을 **`useState(() => 읽기)` 같은 lazy initializer로 렌더링 중 바로 읽으면 안 된다** — 서버 렌더링 시점에는 이 값이 항상 비어있어(브라우저 전용 API), 서버가 렌더링한 결과와 클라이언트 첫 렌더 결과가 달라지는 하이드레이션(hydration) 에러가 발생한다 (`call/analysis/page.tsx`에서 실제로 겪은 버그). 대신 초기 상태값은 서버·클라이언트 동일하게 고정하고(예: `useState(false)`, `useState("loading")`), 실제 값은 마운트 후 `useEffect` 안에서 읽어 `setState`한다 — 이때 `react-hooks/set-state-in-effect` 린트 규칙에 걸리는 것은 정상이며, 불가피한 경우이므로 `// eslint-disable-next-line react-hooks/set-state-in-effect -- ...` 주석으로 이유를 남기고 억제한다.
 
 ## 기능 범위 (US ID는 `01. 유저스토리 - 시트1.pdf` 기준, `lib/routes.ts` 주석과 1:1 매핑)
 
@@ -91,7 +101,9 @@ public/
 
 ## 데이터/API 현황
 
-- **실제 네트워크 요청이 나가는 건 `POST /api/tts` 하나뿐**이다 (`src/app/api/tts/route.ts`). Google Cloud TTS 서비스 계정 키를 `.env.local`의 `GOOGLE_TTS_PROJECT_ID` / `GOOGLE_TTS_CLIENT_EMAIL` / `GOOGLE_TTS_PRIVATE_KEY`로 관리한다. 실패 시 브라우저 `speechSynthesis`로 자동 폴백한다.
+- **실제 네트워크 요청이 나가는 라우트는 두 개**다.
+  - `POST /api/tts` (`src/app/api/tts/route.ts`) — Google Cloud TTS. 서비스 계정 키를 `.env.local`의 `GOOGLE_TTS_PROJECT_ID` / `GOOGLE_TTS_CLIENT_EMAIL` / `GOOGLE_TTS_PRIVATE_KEY`로 관리한다. 실패 시 브라우저 `speechSynthesis`로 자동 폴백한다.
+  - `POST /api/analyze` (`src/app/api/analyze/route.ts`) — Google Gemini(`gemini-2.0-flash`, `@google/generative-ai`). 전화 시뮬레이션 퀴즈 결과를 받아 `responseSchema`로 구조화된 JSON 피드백(`feedback`/`responseSpeed`/`suspicion`/`goodPoints`/`missedPoints`/`actionTips`)을 생성한다. API 키는 `.env.local`의 `GOOGLE_GEMINI_API_KEY`(Google AI Studio에서 무료 발급). 정확도(`accuracy`)는 AI가 생성하지 않고 퀴즈 정답 여부로 클라이언트에서 직접 계산한다 — 수치 정확성을 LLM에 맡기지 않기 위함. 호출 화면(`call/analysis/page.tsx`)은 `useRef` 기반 dedup 가드로 감싸 React Strict Mode의 effect 이중 실행으로 인한 중복 호출(불필요한 API 비용)을 방지한다.
 - 시나리오/사례 데이터는 `lib/mock-cases.ts`의 `MOCK_CASES` 배열이 유일한 소스다. 실제 DB 연결 전까지 여기에 추가한다.
 - 로그인 상태·알림 설정·글자 크기 등은 전부 `localStorage`(`voiceshield-*` 키)로 관리되며 서버에는 저장되지 않는다.
 - 매일 학습 알림은 서비스워커/Web Push가 아니라 **탭이 열려 있는 동안만 동작하는 `setTimeout` 기반 로컬 알림**이다. iOS Safari는 홈 화면에 추가해도 이 방식으로는 알림이 오지 않을 가능성이 높다 (Web Push + 서비스워커 필요).

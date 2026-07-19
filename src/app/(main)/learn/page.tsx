@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FiSearch } from "react-icons/fi";
 import { ROUTES } from "@/lib/routes";
@@ -11,6 +11,10 @@ import { BackHeader } from "@/components/layout/BackHeader";
 import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
 import { ScenarioCard } from "@/components/cards/ScenarioCard";
 import { CategoryTagRow } from "@/components/learn/CategoryTagRow";
+import { applyProgressOverride, readProgressSnapshot, type ProgressSnapshot } from "@/lib/progress";
+
+const DEFAULT_CONTINUE_CASE_ID = "institution-01";
+const EMPTY_PROGRESS_SNAPSHOT: ProgressSnapshot = { recentInProgressCaseId: null, overrides: {} };
 
 function isCaseCategory(value: string | null): value is CaseCategory {
   return !!value && value in CATEGORY_META;
@@ -32,19 +36,27 @@ function LearnPageContent() {
   );
   const [query, setQuery] = useState("");
 
-  const continueCase = getCaseById("institution-01")!;
+  const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
+    setProgress(readProgressSnapshot());
+  }, []);
+
+  const continueCaseId = progress.recentInProgressCaseId ?? DEFAULT_CONTINUE_CASE_ID;
+  const continueCase = applyProgressOverride(getCaseById(continueCaseId)!, progress);
   const filteredCases = MOCK_CASES.filter(
     (c) =>
       (category === "all" || c.category === category) &&
       c.title.toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  ).map((c) => applyProgressOverride(c, progress));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-gray-100">
       <div className="shrink-0">
         <BackHeader title="학습하기" backHref={ROUTES.home} />
 
-        <div className="flex flex-col gap-3.5 px-4 pb-6">
+        <div className="flex flex-col gap-3.5 px-4" style={{ paddingBottom: "clamp(16px, 4cqw, 24px)" }}>
           <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] mt-2">
             <FiSearch className="shrink-0 text-gray-500" size={16} />
             <input

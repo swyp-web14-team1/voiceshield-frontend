@@ -39,7 +39,7 @@ export function ContinueLearningCard({
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <span className="text-xs text-white/70">{heading}</span>
-          <span className="truncate text-[0.8125rem] font-semibold text-white">{phishingCase.title}</span>
+          <span className="truncate text-[0.8125rem] font-medium text-white">{phishingCase.title}</span>
         </div>
         <span className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-blue-600">이어하기</span>
       </Link>

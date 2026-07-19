@@ -39,6 +39,7 @@ export interface PhishingCase {
   phoneDialogue: PhishingDialogueLine[];
   callerLabel: string; // 전화 시뮬레이션에서 발신자로 표시할 이름 (예: "시청 주무관 사칭범")
   quiz: QuizQuestion[]; // 전화 시뮬레이션 중간에 등장하는 판단 퀴즈
+  finalQuiz: QuizQuestion; // 시뮬레이션 완료 후 "마무리 퀴즈"에서 등장하는 문제 (같은 주제의 다른 문항)
 }
 
 export interface LearningProgress {
@@ -46,4 +47,21 @@ export interface LearningProgress {
   completedCases: number;
   weakCategories: CaseCategory[];
   todayLearningMinutes: number;
+}
+
+// POST /api/analyze 요청/응답 — Gemini가 생성하는 시뮬레이션 결과 피드백
+export interface AnalyzeRequest {
+  caseTitle: string;
+  category: string;
+  quiz: QuizQuestion[];
+  answers: (number | null)[];
+}
+
+export interface AiAnalysisResult {
+  feedback: string; // AI 피드백 본문
+  responseSpeed: string; // 반응 속도 (예: 빠름/보통/느림)
+  suspicion: string; // 의심도 (예: 낮음/적절/높음)
+  goodPoints: string[]; // 좋았던 점
+  missedPoints: string[]; // 놓친 부분
+  actionTips: string[]; // 행동수칙
 }
