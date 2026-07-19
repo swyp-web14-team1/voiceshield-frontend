@@ -177,7 +177,7 @@ export default function RecordPage() {
           </div>
         </section>
 
-        <section className="flex h-14.5 items-center justify-between rounded-xl bg-white px-4.5 shadow-[0px_1px_3px_rgba(0,0,0,0.07)]">
+        <section className="flex py-1 items-center justify-between rounded-xl bg-white px-4.5 shadow-[0px_1px_3px_rgba(0,0,0,0.07)] ">
           <div className="flex items-center gap-2">
             <IoCheckmarkCircle className="text-[#f97316]" size={16} />
             <p className="text-sm font-semibold text-[#1a2332]">완료 시나리오 개수</p>
