@@ -67,7 +67,7 @@ export function CategoryTagRow({ value, onChange }: CategoryTagRowProps) {
           className={`shrink-0 rounded-full text-[clamp(12px,3.2cqw,14px)] font-semibold whitespace-nowrap ${
             value === key ? "bg-gray-600 text-white" : "bg-white text-gray-600 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
           }`}
-          style={{ paddingInline: "clamp(12px, 4cqw, 16px)", paddingBlock: "clamp(3px, 1.3cqw, 4px)" }}
+          style={{ paddingInline: "clamp(12px, 4cqw, 16px)", paddingBlock: "clamp(3.5px, 1cqw, 4px)" }}
         >
           {CATEGORY_META[key].label}
         </button>

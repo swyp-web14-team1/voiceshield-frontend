@@ -28,7 +28,7 @@ export default function LoginPage() {
     <div
       className="flex min-h-full flex-1 flex-col items-center"
       style={{
-        paddingTop: "clamp(160px, 24cqh, 230px)",
+        paddingTop: "clamp(150px, 23cqh, 230px)",
         paddingBottom: "clamp(16px, 4cqh, 32px)",
       }}
     >
