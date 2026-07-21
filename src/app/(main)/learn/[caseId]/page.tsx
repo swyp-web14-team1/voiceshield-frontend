@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BiPhoneCall } from "react-icons/bi";
 import { LuMessageSquareMore } from "react-icons/lu";
 import { getCaseById } from "@/lib/mock-cases";
-import { CATEGORY_META, INSTITUTION_ICON_SIZE } from "@/lib/case-meta";
+import { CATEGORY_META, INSTITUTION_ICON_SIZE_LEARN } from "@/lib/case-meta";
 import { ROUTES } from "@/lib/routes";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { CaseStatsGrid } from "@/components/cards/CaseStatsGrid";
@@ -33,7 +33,7 @@ export default async function ScenarioDetailPage({ params }: { params: Promise<{
               {phishingCase.category === "institution" ? (
                 <CategoryIcon
                   className="text-white"
-                  style={{ width: INSTITUTION_ICON_SIZE, height: INSTITUTION_ICON_SIZE }}
+                  style={{ width: INSTITUTION_ICON_SIZE_LEARN, height: INSTITUTION_ICON_SIZE_LEARN }}
                 />
               ) : (
                 <CategoryIcon className="size-3 text-white" />
