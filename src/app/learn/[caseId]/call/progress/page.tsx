@@ -131,7 +131,6 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setPlayingLineIndex(index);
 
-    let audio: HTMLAudioElement | null = null;
     let url: string | null = null;
 
     try {
@@ -141,23 +140,27 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       url = URL.createObjectURL(blob);
       if (token !== playTokenRef.current) throw new Error("superseded");
 
-      audio = new Audio(url);
-      audioRef.current = audio;
-      const currentAudio = audio;
+      // 매 대사마다 `new Audio()`로 새 엘리먼트를 만들면 모바일 사파리 등에서 첫 대사 이후로는
+      // 사용자 제스처와 무관한 새 엘리먼트로 취급돼 재생이 막히는 경우가 있다 — 엘리먼트 하나를
+      // 계속 재사용하며 src만 바꿔서(이미 한 번 재생에 성공한 엘리먼트는 이후에도 계속 허용되는
+      // 경향이 있음) 이 문제를 피한다.
+      if (!audioRef.current) audioRef.current = new Audio();
+      const currentAudio = audioRef.current;
+      currentAudio.src = url;
       const ended = new Promise<void>((resolve) => {
         currentAudio.onended = () => resolve();
         currentAudio.onerror = () => resolve();
 
         currentAudio.onpause = () => resolve();
       });
-      await audio.play();
+      await currentAudio.play();
       if (token !== playTokenRef.current) throw new Error("superseded");
       await withTimeout(ended, PLAYBACK_TIMEOUT_MS);
     } catch {
 
-      if (audio) {
-        audio.pause();
-        audio.src = "";
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
       }
       if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
       if (token !== playTokenRef.current) return;
@@ -491,15 +494,13 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
               <RiShiningLine size={15} />
               AI 분석 결과 보기
             </button>
-            <div className="rounded-lg p-[1.5px]" style={{ backgroundImage: HEADER_GRADIENT }}>
-              <button
-                type="button"
-                onClick={() => router.push(ROUTES.callQuiz(caseId))}
-                className="flex h-10.25 w-full cursor-pointer items-center justify-center rounded-[7px] bg-white text-sm font-semibold text-[#1a2035] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50"
-              >
-                마무리 퀴즈 하러 가기
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => router.push(ROUTES.callQuiz(caseId))}
+              className="flex h-10.25 w-full cursor-pointer items-center justify-center rounded-[7px] border border-[#1a2035] bg-white text-sm font-semibold text-[#1a2035] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50"
+            >
+              마무리 퀴즈 하러 가기
+            </button>
           </div>
         </>
       )}

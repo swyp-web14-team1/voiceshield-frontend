@@ -48,14 +48,16 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
         className="relative flex shrink-0 flex-col items-center gap-3.5 text-white"
         style={{ backgroundImage: HEADER_GRADIENT, paddingTop: "34px", paddingBottom: "30px" }}
       >
-        <button
-          type="button"
-          aria-label="종료"
-          onClick={() => setShowExitModal(true)}
-          className="absolute top-5 left-6.5 cursor-pointer text-white/90"
-        >
-          <FiX size="clamp(18px, 5cqw, 22px)" />
-        </button>
+        {!isDone && (
+          <button
+            type="button"
+            aria-label="종료"
+            onClick={() => setShowExitModal(true)}
+            className="absolute top-5 left-6.5 cursor-pointer text-white/90"
+          >
+            <FiX size="clamp(18px, 5cqw, 22px)" />
+          </button>
+        )}
         <div className="flex h-[clamp(23px,5cqw,27px)] items-center justify-center rounded-full border border-white/50 bg-white/20 px-[clamp(14px,3cqw,18px)]">
           <p className="text-[clamp(13px,3.6cqw,16px)] font-semibold">{isDone ? "퀴즈 결과" : "퀴즈"}</p>
         </div>

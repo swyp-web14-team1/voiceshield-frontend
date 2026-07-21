@@ -197,6 +197,20 @@ export default function SettingsPage() {
 
   const handleToggleReminder = async () => {
     const turningOn = !reminderOn;
+
+    if (turningOn) {
+      // 홈 화면에 추가하지 않은 모바일 브라우저 탭에서는 알림을 켜도 탭이 닫히는 순간 예약이 사라진다 —
+      // 이런 상태에서 토글만 "활성화"로 켜두면 실제로는 안 오는 알림을 사용자가 오는 줄 알게 된다.
+      // 설치 안내만 띄우고, 실제로 홈 화면에 추가해 standalone으로 열기 전까지는 토글을 켜지 않는다.
+      const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const isStandalone =
+        typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
+      if (isMobile && !isStandalone) {
+        setShowInstallGuide(true);
+        return;
+      }
+    }
+
     setReminderOn(turningOn);
     localStorage.setItem(REMINDER_STORAGE_KEY, String(turningOn));
     if (!turningOn) return;
@@ -206,13 +220,6 @@ export default function SettingsPage() {
         await Notification.requestPermission();
       } catch {
       }
-    }
-
-    const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isStandalone =
-      typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
-    if (isMobile && !isStandalone) {
-      setShowInstallGuide(true);
     }
   };
 

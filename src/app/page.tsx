@@ -34,7 +34,7 @@ export default function LoginPage() {
     >
       <div
         className="flex flex-col items-center text-center"
-        style={{ gap: "clamp(14px, 1.5cqh, 44px)" }}
+        style={{ gap: "clamp(14px, 4cqh, 44px)" }}
       >
         <Image
           src="/logo_f.svg"
@@ -44,7 +44,7 @@ export default function LoginPage() {
           priority
           style={{ width: "clamp(80px, 27cqw, 155px)", height: "clamp(80px, 27cqw, 123px)" }}
         />
-        <p className="text-sm leading-[1.45] tracking-tight text-gray-600 dark:text-gray-400">
+        <p className="text-sm leading-[1.45] tracking-tight text-gray-600 dark:text-gray-400 font-normal">
           실전 시뮬레이션으로 배우는
           <br />
           보이스피싱 예방 학습
@@ -62,7 +62,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleKakaoLogin}
-            className="flex w-full items-center justify-between bg-[#FEE500] text-xs font-semibold text-[#3c1e1e] cursor-pointer hover:bg-[#f7de04]"
+            className="flex w-full items-center justify-between bg-[#FEE500] text-xs font-medium text-[#3c1e1e] cursor-pointer hover:bg-[#f7de04]"
             style={{
               paddingInline: "clamp(12px, 4cqw, 20px)",
               paddingBlock: "clamp(8px, 2cqw, 9px)",
@@ -78,7 +78,7 @@ export default function LoginPage() {
           <Link
             href={ROUTES.home}
             onClick={handleGuestStart}
-            className="flex w-full items-center justify-between border border-gray-300 text-xs font-semibold text-gray-500 dark:border-gray-700"
+            className="flex w-full items-center justify-between border border-gray-300 text-xs font-medium text-gray-500 dark:border-gray-700"
             style={{
               paddingInline: "clamp(12px, 4cqw, 20px)",
               paddingBlock: "clamp(8px, 2cqw, 9px)",

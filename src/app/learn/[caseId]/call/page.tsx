@@ -11,6 +11,27 @@ import { getStoredTtsPreference, prefetchTts } from "@/lib/tts";
 const ACTION_BUTTON_SIZE = "clamp(56px, 18cqw, 75px)";
 const ACTION_ICON_SIZE = "clamp(22px, 6cqw, 30px)";
 const CALL_END_ICON_WIDTH = "clamp(27px, 8cqw, 37px)";
+// 무음 44바이트 WAV. 모바일 브라우저는 오디오/TTS 재생을 "사용자 제스처와 동일한 이벤트" 안에서 시작해야만
+// 허용한다 — 통화 진행 화면(call/progress)의 대사 재생은 useEffect 안에서 fetch 이후에 시작되므로 이 조건을
+// 만족하지 못해 조용히 막히고, 결국 매 대사마다 강제 타임아웃(15초)까지 멈춰 있는 것처럼 보이는 문제가 있었다.
+// "시작하기" 버튼 클릭(진짜 사용자 제스처) 안에서 무음을 한 번 재생해두면 이후 같은 세션에서 만들어지는
+// Audio/speechSynthesis 재생이 모두 잠금 해제된다.
+const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
+function unlockMobileAudio() {
+  try {
+    new Audio(SILENT_WAV).play().catch(() => {});
+  } catch {
+    // ignore
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+    } catch {
+      // ignore
+    }
+  }
+}
 
 export default function IncomingCallPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
@@ -76,7 +97,10 @@ export default function IncomingCallPage({ params }: { params: Promise<{ caseId:
 
         <button
           type="button"
-          onClick={() => router.push(ROUTES.callProgress(caseId))}
+          onClick={() => {
+            unlockMobileAudio();
+            router.push(ROUTES.callProgress(caseId));
+          }}
           className="flex flex-col items-center"
           style={{ gap: "clamp(10px, 3cqh, 16px)" }}
         >
