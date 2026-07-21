@@ -4,17 +4,17 @@ import { use, useEffect, useState } from "react";
 import { useRouter, notFound } from "next/navigation";
 import { FiX, FiBookOpen } from "react-icons/fi";
 import { RiCheckboxCircleFill } from "react-icons/ri";
-import { MdCancel, MdOutlineReplay } from "react-icons/md";
+import { MdOutlineReplay, MdCancel } from "react-icons/md";
 import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
 import { ROUTES } from "@/lib/routes";
 import { AUTH_STORAGE_KEY } from "@/lib/auth";
 import { playFeedbackTone } from "@/lib/sound";
 import { recordCaseProgress } from "@/lib/progress";
+import { useStudyTimeTracker } from "@/lib/daily-stats";
 import { RecommendedCard } from "@/components/cards/RecommendedCard";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
-import { ChatBubbleIcon, ArrowIcon } from "@/components/icons/kakao-icons";
-import { FaCheck } from "react-icons/fa";
+import { GuestSaveProgressCard } from "@/components/auth/GuestSaveProgressCard";
 
 const HEADER_GRADIENT = "linear-gradient(165deg, #1a2035 0%, #2d1f4e 100%)";
 
@@ -23,6 +23,8 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
   const router = useRouter();
   const phishingCase = getCaseById(caseId);
   if (!phishingCase) notFound();
+
+  useStudyTimeTracker();
 
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
@@ -52,7 +54,7 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
           onClick={() => setShowExitModal(true)}
           className="absolute top-5 left-6.5 cursor-pointer text-white/90"
         >
-          <FiX size="clamp(15px, 4.5cqw, 21px)" />
+          <FiX size="clamp(18px, 5cqw, 22px)" />
         </button>
         <div className="flex h-[clamp(23px,5cqw,27px)] items-center justify-center rounded-full border border-white/50 bg-white/20 px-[clamp(14px,3cqw,18px)]">
           <p className="text-[clamp(13px,3.6cqw,16px)] font-semibold">{isDone ? "퀴즈 결과" : "퀴즈"}</p>
@@ -181,59 +183,10 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
               </div>
 
               {!isLoggedIn && (
-                <div
-                  className="flex items-center justify-center gap-4 rounded-xl px-4 py-5.5 shadow-[0px_1px_3px_rgba(0,0,0,0.1)]"
+                <GuestSaveProgressCard
+                  onLoggedIn={() => setIsLoggedIn(true)}
                   style={{ backgroundImage: HEADER_GRADIENT }}
-                >
-                  <div className="flex flex-col gap-2">
-                    <p className="text-base font-semibold text-white">
-                      간편 로그인 하고
-                      <br />
-                      이번 학습을 저장해보세요!
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        localStorage.setItem(AUTH_STORAGE_KEY, "true");
-                        setIsLoggedIn(true);
-                      }}
-                      className="flex w-fit shrink-0 cursor-pointer items-center gap-4 bg-[#FEE500] text-xs leading-none font-semibold whitespace-nowrap text-[#3c1e1e] hover:bg-[#f7de04]"
-                      style={{
-                        paddingInline: "clamp(10px, 4cqw, 13px)",
-                        paddingBlock: "clamp(5px, 2cqw, 7px)",
-                        borderRadius: "clamp(4px, 1.558cqw, 7.79px)",
-                      }}
-                    >
-                      <span className="flex items-center gap-[0.667em] font-semibold">
-                        <ChatBubbleIcon />
-                        Kakao로 시작하기
-                      </span>
-                      <ArrowIcon className="text-[#3c1e1e70]" />
-                    </button>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-stretch gap-2">
-                    {["학습 진행률 저장", "완료한 학습 기록", "취약 유형 분석"].map((label) => (
-                      <span
-                        key={label}
-                        className="relative flex items-center justify-center gap-1 overflow-hidden rounded-full bg-white/10 px-[clamp(8px,3cqw,12px)] py-[clamp(5px,1.8cqw,7px)] text-[clamp(10px,2.8cqw,12px)] font-medium whitespace-nowrap text-white backdrop-blur-lg shadow-[0_12px_24px_-4px_rgba(13,10,31,0.2),inset_4px_4px_12px_rgba(0,0,0,0.1)]"
-                      >
-                        <div
-                          className="pointer-events-none absolute inset-0 -z-10 rounded-full"
-                          style={{
-                            padding: "0.7px",
-                            background:
-                              "linear-gradient(-15deg, rgba(255,255,255,0.6) 10%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.1) 60%, rgba(255,255,255,0.5) 100%)",
-                            WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-                            WebkitMaskComposite: "xor",
-                            maskComposite: "exclude",
-                          }}
-                        />
-                        <FaCheck size="clamp(10px, 2.8cqw, 12px)" className="shrink-0" color="#60A5FA" />
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                />
               )}
             </>
           )}

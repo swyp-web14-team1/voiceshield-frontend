@@ -12,6 +12,7 @@ import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
 import { ScenarioCard } from "@/components/cards/ScenarioCard";
 import { CategoryTagRow } from "@/components/learn/CategoryTagRow";
 import { applyProgressOverride, readProgressSnapshot, type ProgressSnapshot } from "@/lib/progress";
+import { useIsLoggedIn } from "@/lib/auth";
 
 const DEFAULT_CONTINUE_CASE_ID = "institution-01";
 const EMPTY_PROGRESS_SNAPSHOT: ProgressSnapshot = { recentInProgressCaseId: null, overrides: {} };
@@ -37,6 +38,7 @@ function LearnPageContent() {
   const [query, setQuery] = useState("");
 
   const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
+  const isLoggedIn = useIsLoggedIn();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
@@ -72,14 +74,16 @@ function LearnPageContent() {
       </div>
 
       <div className="no-scrollbar flex flex-1 flex-col gap-3.5 overflow-y-auto px-4 pb-6">
-        <ContinueLearningCard
-          heading="최근 학습한 사례"
-          href={ROUTES.scenario(continueCase.id)}
-          phishingCase={continueCase}
-          difficultyLabel={DIFFICULTY_META[continueCase.difficulty].label}
-          difficultyColor={DIFFICULTY_META[continueCase.difficulty].bg}
-          variant="compact"
-        />
+        {isLoggedIn && (
+          <ContinueLearningCard
+            heading="최근 학습한 사례"
+            href={ROUTES.scenario(continueCase.id)}
+            phishingCase={continueCase}
+            difficultyLabel={DIFFICULTY_META[continueCase.difficulty].label}
+            difficultyColor={DIFFICULTY_META[continueCase.difficulty].bg}
+            variant="compact"
+          />
+        )}
         {filteredCases.map((c) => (
           <ScenarioCard key={c.id} phishingCase={c} />
         ))}

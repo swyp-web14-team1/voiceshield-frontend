@@ -1,7 +1,13 @@
 import { MOCK_CASES } from "@/lib/mock-cases";
+import { AUTH_STORAGE_KEY } from "@/lib/auth";
 import type { PhishingCase } from "@/types";
 
 const PROGRESS_STORAGE_KEY = "voiceshield-case-progress";
+
+function isLoggedIn(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(AUTH_STORAGE_KEY) === "true";
+}
 
 export type CasePhase = "dialogue" | "quiz" | "complete" | "finalQuiz";
 
@@ -19,6 +25,8 @@ interface StoredCaseProgress {
   updatedAt: number;
   /** AI 분석 결과의 정답률(0~100). AI 분석을 아직 본 적 없으면 undefined. */
   accuracy?: number;
+  /** 처음 isCompleted가 true가 된 시각. 이후 같은 케이스를 다시 봐도 갱신하지 않는다 ("오늘 완료 시나리오" 집계용). */
+  completedAt?: number;
 }
 
 type ProgressMap = Record<string, StoredCaseProgress>;
@@ -38,22 +46,42 @@ function writeProgressMap(map: ProgressMap) {
   localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(map));
 }
 
-/** 시뮬레이션 진행 중 도달한 단계를 기록한다. 이전 기록보다 진행률이 낮으면 값은 유지하고 접속 시각만 갱신한다. */
+/** 시뮬레이션 진행 중 도달한 단계를 기록한다. 이전 기록보다 진행률이 낮으면 값은 유지하고 접속 시각만 갱신한다. 게스트(비로그인)는 저장하지 않는다(US-56). */
 export function recordCaseProgress(caseId: string, phase: CasePhase) {
+  if (!isLoggedIn()) return;
   const map = readProgressMap();
   const nextRate = PHASE_COMPLETION_RATE[phase];
   const existing = map[caseId];
+  const willBeCompleted = phase === "finalQuiz";
+  // 처음 완료되는 순간에만 completedAt을 찍는다 — 이후 재방문 시 updatedAt만 갱신되어도 "오늘 완료"로 잘못 집계되지 않도록.
+  const completedAt = willBeCompleted && !existing?.isCompleted ? Date.now() : existing?.completedAt;
 
   if (existing && existing.completionRate >= nextRate) {
-    map[caseId] = { ...existing, updatedAt: Date.now() };
+    map[caseId] = { ...existing, updatedAt: Date.now(), completedAt };
   } else {
-    map[caseId] = { completionRate: nextRate, isCompleted: phase === "finalQuiz", updatedAt: Date.now() };
+    map[caseId] = { completionRate: nextRate, isCompleted: willBeCompleted, updatedAt: Date.now(), completedAt };
   }
   writeProgressMap(map);
 }
 
-/** AI 분석 결과가 나왔을 때 정답률을 기록한다. completionRate/isCompleted는 건드리지 않고 accuracy만 갱신한다. */
+function isToday(timestamp: number): boolean {
+  const now = new Date();
+  const d = new Date(timestamp);
+  return (
+    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  );
+}
+
+/** 오늘 처음 완료 처리된(finalQuiz 도달) 시나리오 개수. 서버 렌더링 시점에는 항상 0. */
+export function getTodayCompletedCount(): number {
+  if (typeof window === "undefined") return 0;
+  const map = readProgressMap();
+  return Object.values(map).filter((v) => v.completedAt !== undefined && isToday(v.completedAt)).length;
+}
+
+/** AI 분석 결과가 나왔을 때 정답률을 기록한다. completionRate/isCompleted는 건드리지 않고 accuracy만 갱신한다. 게스트(비로그인)는 저장하지 않는다. */
 export function recordAnalysisAccuracy(caseId: string, accuracy: number) {
+  if (!isLoggedIn()) return;
   const map = readProgressMap();
   const existing = map[caseId];
   map[caseId] = existing

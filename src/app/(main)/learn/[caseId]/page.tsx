@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BiPhoneCall } from "react-icons/bi";
 import { LuMessageSquareMore } from "react-icons/lu";
 import { getCaseById } from "@/lib/mock-cases";
-import { CATEGORY_META } from "@/lib/case-meta";
+import { CATEGORY_META, INSTITUTION_ICON_SIZE } from "@/lib/case-meta";
 import { ROUTES } from "@/lib/routes";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { CaseStatsGrid } from "@/components/cards/CaseStatsGrid";
@@ -30,7 +30,14 @@ export default async function ScenarioDetailPage({ params }: { params: Promise<{
               className="flex size-5 items-center justify-center rounded-md"
               style={{ backgroundColor: category.bg }}
             >
-              <CategoryIcon className="size-3 text-white" />
+              {phishingCase.category === "institution" ? (
+                <CategoryIcon
+                  className="text-white"
+                  style={{ width: INSTITUTION_ICON_SIZE, height: INSTITUTION_ICON_SIZE }}
+                />
+              ) : (
+                <CategoryIcon className="size-3 text-white" />
+              )}
             </div>
             <span className="text-sm font-semibold text-white">{category.label}</span>
           </div>
@@ -99,14 +106,14 @@ export default async function ScenarioDetailPage({ params }: { params: Promise<{
           <BiPhoneCall size={17} />
           전화로 시작
         </Link>
-        <button
-          type="button"
+        <Link
+          href={ROUTES.messageProgress(caseId)}
           className="flex items-center justify-center gap-1.25 rounded-lg bg-white text-sm font-bold text-blue-600 shadow-[0px_1px_3px_rgba(0,0,0,0.1)] transition-colors [@media(hover:hover)_and_(pointer:fine)]:hover:bg-blue-50"
           style={{ width: "clamp(100px, 30cqw, 127px)", paddingBlock: "clamp(8px, 2.5cqh, 10px)" }}
         >
           <LuMessageSquareMore size={17} />
           문자로 시작
-        </button>
+        </Link>
       </div>
     </div>
   );

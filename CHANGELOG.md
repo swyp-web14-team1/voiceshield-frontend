@@ -2,6 +2,176 @@
 
 기능을 구현하거나 수정할 때마다 아래 형식으로 최상단에 추가한다 (기존 내용은 지우지 않음).
 
+## [2026-07-21] 기록 화면 카테고리 아이콘·긴급 신고 안내 경고 아이콘을 반응형으로 전환
+- 수정 파일: `src/app/(main)/record/page.tsx`, `src/app/(main)/emergency/page.tsx`
+- 변경 내용:
+  - `record/page.tsx`의 `CategoryIcon`(완료한 학습 목록·취약 유형 태그에서 공용으로 쓰는 카테고리 아이콘)이 `size` prop을 고정 px 숫자로 받아 배지·아이콘 크기가 전혀 반응형이 아니었음 — 주변 텍스트·패딩은 `cqw`로 줄어드는데 이 아이콘만 고정폭이라 좁은 화면에서 상대적으로 커 보였음. `size`를 CSS 길이 문자열로 바꾸고 호출부(`CompletedCaseRow`는 `clamp(12px, 4cqw, 16px)`, `WeakCategoryTag`는 `clamp(8px, 2.6cqw, 10px)`)를 반응형 clamp로 교체. 배지 크기도 `size + 14`(숫자 연산) 대신 `calc(${size} + 14px)`로 변경.
+  - `emergency/page.tsx`의 `TipCard` 상단 경고 아이콘(`FiAlertTriangle`)이 `size={30}` 고정값이었던 것을, 감싸는 스트립(`clamp(56px, 15cqw, 75px)`)은 이미 반응형인데 아이콘만 고정이라 좁은 화면에서 큼직해 보이는 문제가 있어 `clamp(20px, 6cqw, 30px)`로 교체.
+- 비고: 둘 다 사용자가 스크린샷으로 "반응형 했어? 크기가 왜케 크지"라고 지적한 지점 — 컨테이너/텍스트는 반응형인데 아이콘만 고정 px로 남아있던 동일 패턴의 버그.
+
+## [2026-07-21] 학습하기 목록의 기관사칭 아이콘 상한만 홈 화면과 다르게 분리
+- 수정 파일: `src/lib/case-meta.ts`, `src/components/cards/ScenarioCard.tsx`
+- 변경 내용: 홈 화면(28~40px 반응형 배지)과 학습하기 목록(`ScenarioCard`, 고정 20px 배지)이 같은 `INSTITUTION_ICON_SIZE`(상한 19px)를 공유해서, 고정 20px 배지 쪽에서는 여전히 아이콘이 배지를 거의 꽉 채워 보였음. 홈 화면용 `INSTITUTION_ICON_SIZE`(상한 19px)는 그대로 두고, 학습하기 목록 전용 `INSTITUTION_ICON_SIZE_LEARN`(`clamp(10px, 3cqw, 14px)`, 상한 14px)을 새로 추가해 `ScenarioCard`에만 적용.
+- 비고: 시나리오 상세 헤더(`learn/[caseId]/page.tsx`)·기록 화면(`record/page.tsx`)은 이번 요청 범위(학습하기 목록)가 아니라 손대지 않음 — 동일한 고정 20px 배지 패턴이라 필요하면 같은 상수를 적용할 수 있음.
+
+## [2026-07-21] 기관사칭 아이콘 반응형 최소 크기만 축소, "이어서 학습하기" 카드도 다른 화면과 동일한 파란 배경 사용
+- 수정 파일: `src/lib/case-meta.ts`, `src/components/cards/ContinueLearningCard.tsx`
+- 변경 내용:
+  - `INSTITUTION_ICON_SIZE`의 clamp 하한만 `14px` → `10px`로 축소(`clamp(14px, 4cqw, 19px)` → `clamp(10px, 4cqw, 19px)`). 상한(19px)·비례 계수(4cqw)는 기존 그대로 유지 — 좁은 컨테이너에서 아이콘이 필요 이상으로 커 보이던 것만 보정.
+  - `ContinueLearningCard`("이어서 학습하기")에서 기관사칭 아이콘 배경을 다른 화면과 다르게 옅은 남색(`rgba(138,155,188,0.44)`)으로 예외 처리해뒀던 것을 제거 — 이제 다른 화면들과 동일하게 `CATEGORY_META`의 `#2b7fff`를 그대로 사용.
+- 비고: `ContinueLearningCard`의 회색 예외는 이전 세션에서 명시적으로 요청받아 추가했던 것인데, 이번에 사용자가 다시 통일해달라고 요청해 되돌림.
+
+## [2026-07-21] 데스크톱 배경 웨이브를 손으로 트레이싱한 SVG 대신 Figma 원본 에셋(`public/bg.svg`)으로 교체
+- 수정 파일: `src/app/layout.tsx`
+- 변경 내용: 직전까지 스크린샷을 눈대중으로 트레이싱해 만든 베지어 곡선 근사치를 쓰고 있었는데, Figma에서 실제 벡터를 그대로 export한 `public/bg.svg`(1920×1080, mask+gradient 방식, node 86:1467 배경과 동일)로 교체 — 근사가 아닌 원본 그대로. `<svg>` 인라인 마크업을 `next/image`의 `<Image src="/bg.svg" fill priority sizes="100vw" className="object-cover" />`로 교체(부모 div가 이미 `fixed`라 `fill` 사용 가능). 기존과 동일하게 부모 div에 `min-[1400px]:block`이 걸려 있어 1400px 미만에서는 그대로 노출되지 않음.
+- 비고: Playwright로 1300px 뷰포트에서 배경 div `display: none` 확인, 1920px 뷰포트에서 셸 양옆에 웨이브가 끊김 없이 이어지는지 육안 확인.
+
+## [2026-07-21] 데스크톱 배경 웨이브 곡선을 Figma(node 91:1745) 실제 형태로 재보정
+- 수정 파일: `src/app/layout.tsx`
+- 변경 내용: 기존 웨이브 곡선은 왼쪽에서 오른쪽 끝까지 단조 증가(계속 위로만 휘어짐)하는 형태였는데, Figma 레퍼런스를 다시 확인하니 실제로는 왼쪽에서 살짝 아래로 꺼졌다가(트로프) 화면 중앙~우측에서 정점을 찍고 다시 살짝 내려오는 완만한 S자(사인파) 형태였음. 스크린샷을 1920×1080 기준 좌표로 환산해 두 겹(연한 `#e8f0fd`, 진한 `#cfe1fb`) 곡선의 제어점을 다시 잡아 실제 굴곡과 정점 위치를 맞춤.
+- 비고: Figma MCP(`get_screenshot`)로 받은 node 91:1745 래스터 이미지를 좌표 격자로 눈대중 트레이싱해 베지어 제어점을 산출(벡터 패스 자체는 마스크 이미지로 export되어 있어 직접 추출 불가). Playwright로 1920×1000 뷰포트 스크린샷을 찍어 육안 대조.
+
+## [2026-07-21] 데스크톱 마케팅 패널 텍스트/로고 배치를 Figma(node 86:1467) 순서·크기로 재정렬
+- 수정 파일: `src/app/layout.tsx`
+- 변경 내용: Figma 레퍼런스(node 86:1467) 확인 결과 패널 내부 순서가 실제 디자인(서브타이틀 → 헤드라인(+반짝이 장식) → 로고 랙업 순, 로고 랙업은 헤드라인만큼 큰 사이즈로 맨 아래 배치)과 반대로 구현돼 있었음(기존엔 작은 로고+텍스트가 맨 위). 순서를 서브타이틀 → 헤드라인 → 로고 랙업으로 수정하고, 헤드라인 강조 문구 옆에 별 3개짜리 반짝이 SVG 장식 추가. 로고는 아이콘+텍스트를 별도 마크업으로 조합하던 것을, Figma에서 그대로 추출한 통짜 랙업 SVG(`public/logo-j.svg`, `viewBox 0 0 410 73`)로 교체하고 동일 비율(clamp 폭·높이를 같은 vw 계수로 스케일)로 크게 표시.
+- 비고: Figma MCP(`get_design_context`, `get_screenshot`)로 node 86:1467의 정확한 텍스트/로고 순서·상대 크기·위치(1920×1080 캔버스 기준 inset %)를 확인 후 반영. 사용자가 동시에 같은 파일을 직접 편집 중이라 로고 크기(clamp 값)는 사용자가 마지막으로 조정한 값을 유지하고, Next.js `Image`에 누락돼 있던 필수 `width`/`height`만 보완.
+
+## [2026-07-21] 데스크톱 마케팅 패널 브레이크포인트 1400px로 상향, 웨이브 배경을 화면 전체를 가로지르는 단일 SVG로 재구성, 셸 그림자 대비 강화
+- 수정 파일: `src/app/layout.tsx`
+- 변경 내용:
+  - 아이패드 프로 가로(1366px)에서도 데스크톱 마케팅 패널이 잘못 노출되는 문제가 있어, 브레이크포인트를 `xl:`(1280px)에서 Tailwind 임의값 `min-[1400px]:`(1400px)로 상향. Playwright로 1366px 뷰포트에서 `aside` `display: none` 확인.
+  - 패널 내부 장식을 기존 blur 원형 blob 방식에서 인라인 `<svg>` 웨이브로 교체하는 과정에서, 처음엔 왼쪽 패널과 오른쪽 388px 여백(`mr-97`)에 각각 별도의 작은 웨이브 SVG(`viewBox 0 0 856 481`, 오른쪽은 좌우 반전)를 따로 그렸으나, 셸을 사이에 두고 곡선이 끊겨 두 조각처럼 보이는 문제가 있었음(Figma node 91:1745 확인 결과 원래는 화면 전체를 가로지르는 하나의 매끄러운 S자 곡선). 이를 셸 뒤에 뷰포트 전체(`inset-0`, `viewBox 0 0 1920 1080`)를 덮는 고정 배경 SVG 한 장으로 교체하고, 왼쪽 패널·오른쪽 여백은 자체 배경을 비워 이 공용 배경이 비쳐 보이게 한 뒤 셸(흰 배경)만 그 위에 얹어 가운데를 가리는 구조로 재구성 — 웨이브가 셸 양옆에서 하나로 이어져 보임.
+  - 셸 그림자가 오른쪽(`min-[1400px]:mr-97` 388px 여백 구간)에서는 거의 안 보인다는 지적 확인 — 원인은 그 여백 구간이 셸과 동일한 순백(`rgb(255,255,255)`) 배경이라 `rgba(0,0,0,0.1)` 블러 그림자가 백-온-백으로 묻혔기 때문. 그림자 자체를 강화(`0px_0px_7px_0px_rgba(0,0,0,0.1)` → `0px_0px_16px_0px_rgba(0,0,0,0.18)`)해 양쪽 모두 보이도록 함(이후 웨이브 배경 재구성으로 오른쪽 여백도 더는 순백이 아니게 되어 대비 문제 자체는 완화됨).
+- 비고: Figma MCP(`get_screenshot`)로 node 91:1745 레퍼런스를 직접 확인 후 곡선 형태를 재구성. Playwright로 1920×1000 뷰포트 스크린샷을 찍어 웨이브가 셸 양옆에서 끊김 없이 이어지는지 육안 확인.
+
+## [2026-07-21] 키 큰 터치 디바이스에서 콘텐츠 짧은 페이지의 BottomNav가 화면 하단에 붙지 않던 문제 수정
+- 수정 파일: `src/app/(main)/layout.tsx`
+- 변경 내용: `(main)` 라우트 그룹의 공용 래퍼가 `[@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none`(키 크고 세로로 긴 터치 디바이스에서 콘텐츠 영역을 `flex-1`→`flex-none`으로 바꾸는 규칙)를 갖고 있었는데, 이 조건에서는 콘텐츠 영역이 뷰포트 전체 높이를 채우도록 늘어나지 않아 `BottomNav`가 짧은 콘텐츠 바로 아래(화면 중간)에 떠버리고 그 밑에 빈 여백이 생기는 문제가 있었음(학습 기록·긴급·설정처럼 콘텐츠가 짧은 페이지에서 특히 심함). 이 미디어쿼리는 `src/app/(main)/home/page.tsx`의 `<main>` 자체에도 별도로 이미 존재해 홈 화면 자체의 의도(카테고리 그리드 등이 큰 화면에서 과도하게 늘어나는 것 방지)는 그쪽에서 이미 충족되고 있었으므로, `(main)/layout.tsx`의 공용 래퍼에 있던 중복 규칙만 제거 — 콘텐츠 영역은 항상 `flex-1`을 유지해 BottomNav가 페이지·기기 조건과 무관하게 항상 화면 최하단에 고정되도록 함.
+- 비고: Playwright로 `viewport 390×1000 + hasTouch` 조건을 재현해 수정 전/후 모든 `(main)` 라우트(홈/학습하기/기록/긴급/설정)에서 `gapBelowNav`를 직접 측정 — 수정 전엔 기록 253px/긴급 135px/설정 258px의 빈틈이 있었고, 수정 후 전부 0으로 확인.
+
+## [2026-07-21] 데스크톱 마케팅 랜딩 패널을 로그인 전용→전체 라우트 공통으로 확장, 배치 방식 재설계 (바로 아래 항목의 후속 수정)
+- 수정 파일: `src/app/layout.tsx`(신규 배치), `src/app/page.tsx`(기존 로그인 전용 구현 제거 — 되돌림)
+- 변경 내용: 바로 아래 항목에서 로그인 화면("/") 전용으로 구현했던 마케팅 패널을 `layout.tsx`로 옮겨 **모든 라우트 공통**으로 변경(어느 화면에 있든 데스크톱에서 왼쪽엔 카피, 오른쪽엔 지금 보고 있는 실제 화면이 그대로 보임). 배치 방식도 재설계:
+  - 브레이크포인트를 `lg:`(1024px)에서 **`xl:`(1280px)로 상향** — 아이패드(세로 768/가로 1024)까지는 지금처럼 셸이 `mx-auto`로 완전히 중앙 정렬되고 패널이 아예 렌더링되지 않으며, 1280px 이상에서만 데스크톱 레이아웃이 적용됨(처음엔 뷰포트 폭에 유동적으로(fluid) 반응하도록 만들었으나, 500~1280px 사이 중간 폭에서 셸이 중앙이 아니라 왼쪽으로 쏠려 보이는 문제가 있어 브레이크포인트 방식으로 되돌림).
+  - 셸은 1280px 이상에서 `mx-auto` 대신 `xl:ml-auto xl:mr-97`(388px, Tailwind 97 step = 97×4px)로 오른쪽에 고정 여백을 두고 붙이고, 패널은 `right: 888px`(500+388)로 그 왼쪽 남은 공간에 고정 배치.
+  - `body { background: var(--background) }`가 `globals.css`에서 `@layer` 밖에 정의돼 있어 Tailwind 유틸리티 클래스(`bg-white` 등)보다 우선순위가 높다는 걸 발견 — body 배경은 인라인 `style={{ backgroundColor: "var(--surface)" }}`로 덮어써야 실제로 흰색이 적용됨.
+  - 셸에 `shadow-[...]`를 추가해 좌우로 살짝 뜬 느낌을 줌(정확한 blur/opacity 값은 반복 조정 중 — 최신 값은 코드 참고).
+- 비고: 원래 계획은 오른쪽에 Figma의 홈 화면 정적 목업을 별도로 만드는 것이었으나, 로그인 화면에만 있던 걸 전체 라우트로 넓히면서 "오른쪽 = 그 라우트의 실제 화면"이 되어 애초에 별도 목업이 필요 없어짐(계획대로 실제 화면 재사용 방침 유지).
+
+## [2026-07-21] 로그인 화면에 데스크톱 전용 마케팅 랜딩 패널 추가 (Figma node 86:1467)
+- 수정 파일: `src/app/page.tsx`
+- 변경 내용: 앱 전체가 `layout.tsx`에서 `max-w-125`(500px) 모바일 셸로 감싸져 중앙 정렬되기 때문에 데스크톱에서는 화면 양옆에 빈 공간이 생기는데, 로그인 화면("/")에서 창 폭이 1024px(Tailwind `lg:`) 이상일 때 그 왼쪽 여백에 헤드라인("읽는 교육이 아닌, 직접 대응하며 배우는 새로운 학습 경험")·서브텍스트("체험형 피싱 예방 학습")·로고 랙업을 보여주는 `<aside>`를 추가. `position: fixed`로 뷰포트 좌측 여백(`right: calc(50% + 250px)`)에 배치해 모바일 셸과 겹치지 않도록 함. 오른쪽(중앙)은 Figma의 홈 화면 정적 목업을 별도로 복제하지 않고 기존 로그인 폼을 그대로 재사용(중복 코드 방지). 장식 배경은 새 이미지 자산 없이 blur된 radial 톤(`#60a5fa`/`#2d1f4e`, 기존 브랜드 컬러 재사용)의 CSS만으로 구현. 헤드라인은 1024px 경계에서 단어가 한 줄씩 끊기지 않도록 `clamp(22px, 2.4vw, 36px)`로 반응형 처리.
+- 비고: 이 프로젝트 최초의 `min-width` 미디어쿼리(`lg:`) 사용 — 모바일 셸 컨테이너 "바깥" 실제 브라우저 폭에 반응해야 해서 기존 컨테이너 쿼리(cqw/cqh) 패턴으로는 불가능했던 유일한 예외. Figma 원본 텍스트 "피싱안심교실"은 기존 코드베이스 브랜딩("피싱안전교실")과 달라 기존 표기를 그대로 따름.
+
+## [2026-07-20] 긴급 신고 안내 화면을 Figma 디자인(node 67:1222/67:1095/67:1112)에 맞춰 재작업
+- 수정/생성 파일:
+  - `src/app/(main)/emergency/page.tsx` — "바로 전화 하기" 제목 아래 "보이스피싱 피해 시 즉시 신고하세요" 서브타이틀 추가. 112/1332 연락처 카드에 그라데이션과 어울리는 `border-2`(빨강/파랑) 추가하고, Figma 레이어 패널에서 확인한 정확한 값으로 그라데이션 수정(경찰청 카드: `#e33a3d→#7d2022`였던 것을 `#ffcbcc→#df1e21`로, 두 카드 모두 방향을 `135deg`에서 `to top right`로 — Figma 그라데이션 핸들이 좌하단→우상단으로 나 있는 것과 일치). "피해 발생 대응"·"예방 수칙" 섹션을 체크리스트(초록 체크 아이콘 + 평문)에서 새 디자인으로 교체 — 카드 상단에 색상 스트립(연빨강/연파랑 배경) 위에 경고 삼각형 아이콘 + 색상 제목을 올리고, 각 항목은 회색 배경의 개별 박스 안에 핵심 문구만 굵게+색상 강조하는 방식(`TipSegment[]` 배열로 강조 구간을 데이터로 표현). 두 섹션이 구조가 동일해 `TipCard` 컴포넌트로 추출해 재사용, 카드 상단 여백은 `mt-3.5`. `IoCheckmarkCircle` import 제거, `FiAlertTriangle` 추가.
+  - 신고 확인 팝업(취소/신고 버튼)은 기존 구현이 이미 새 Figma(67:1095)와 동일해 변경 없음.
+
+## [2026-07-20] 문자 시뮬레이션 판단 퀴즈·마무리 퀴즈 정답/오답 피드백을 전화 버전과 통일, 기관사칭 아이콘/색상 변경
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/message/progress/page.tsx` — 문자 시뮬레이션의 "어떻게 행동 하시겠습니까?" 판단 퀴즈가 플레인 버튼 목록이라 선택해도 아무 시각 피드백 없이 곧장 완료 화면으로 넘어가던 것을, 전화 시뮬레이션(`call/progress`)과 동일한 `QuizCard` 컴포넌트로 교체 — 선택 즉시 정답(그라데이션+체크)/오답(회색+X) 색상과 아이콘이 표시된 뒤 900ms 후 완료 화면으로 전환(`ANSWER_REVEAL_DELAY_MS`). 전환 타이밍을 `answer`(선택값, 즉시 반영)와 `revealComplete`(완료 화면 전환 여부, 지연 반영) 두 상태로 분리해 구현. 메시지 말풍선 텍스트 `leading-relaxed`→`leading-normal`로 줄간격 소폭 축소.
+  - `src/app/learn/[caseId]/call/quiz/page.tsx` (마무리 퀴즈, 전화·문자 공용) — 정답 선택 시에만 체크 아이콘이 보이고 오답 선택 시에는 빨간 배경만 있고 아이콘이 없던 것을, 오답에도 `MdCancel` X 아이콘을 표시하도록 수정(`call/progress`의 판단 퀴즈 완료 리뷰 카드와 동일한 패턴).
+  - `src/lib/case-meta.ts`, `src/app/(main)/home/page.tsx` — 기관사칭 카테고리 아이콘을 커스텀 SVG(`CategoryGovernmentIcon`, 이제 미사용이라 `home-icons.tsx`에서 삭제)에서 `react-icons/go`의 `GoOrganization`으로 교체(기존처럼 `text-white`로 흰색 렌더링). 기관사칭 아이콘 배경색을 옅은 남색(`rgba(138,155,188,0.44)`)에서 `#2b7fff`로 변경 — 홈 카테고리 타일, 학습하기 목록 ScenarioCard, 시나리오 상세, 학습 기록 등 전 화면에 적용.
+  - `src/components/cards/ContinueLearningCard.tsx` — 단, "이어서 학습하기" 카드의 아이콘 배경만은 기존 톤(`rgba(138,155,188,0.44)` = `#8A9BBC` 44%)을 그대로 유지하도록 예외 처리(`iconBg` 계산 시 `category === "institution"`이면 기존 값 사용).
+  - `src/lib/case-meta.ts`(`INSTITUTION_ICON_SIZE = "clamp(14px, 4cqw, 19px)"` 추가), `src/components/cards/ScenarioCard.tsx`, `src/app/(main)/learn/[caseId]/page.tsx`, `src/app/(main)/record/page.tsx`, `src/app/(main)/home/page.tsx` — 기관사칭 아이콘이 다른 카테고리보다 한 단계 크게 보이도록(반응형 상한 19px) 아이콘이 나오는 모든 위치에 적용. 단 `ContinueLearningCard`("이어서 학습하기")는 기존 아이콘 크기 그대로 유지.
+- 비고: 문자 퀴즈와 마무리 퀴즈 모두 "선택 즉시 정답/오답 아이콘+색 표시"라는 동일 UX 원칙을 전화 시뮬레이션 기준으로 통일.
+
+## [2026-07-20] 설정 화면 "매일 학습 알림" 게스트에게 완전히 숨김
+- 수정/생성 파일:
+  - `src/app/(main)/settings/page.tsx` — "매일 학습 알림" `SettingsCard`를 게스트에게 비활성화 스타일(반투명 토글)+클릭 시 `LoginPromptModal`로 보여주던 것을, `isLoggedIn && (...)`로 감싸 섹션 자체를 렌더링하지 않도록 변경(다른 게스트 게이팅 섹션들과 동일한 "숨김" 패턴으로 통일). 더 이상 게스트가 토글을 누를 경로가 없어져 `handleToggleReminder`의 로그인 체크 분기, `showLoginRequired` 상태, `LoginPromptModal` 사용을 모두 제거.
+- 비고: 홈/학습하기/학습 기록에 적용한 "잠금 표시 대신 숨김" 원칙(바로 위 항목 참고)을 설정 화면에도 동일하게 적용.
+
+## [2026-07-20] 게스트 화면을 Figma 디자인(node 61:2032/2063/2111/2193)에 맞춰 재작업
+- 수정/생성 파일:
+  - `src/lib/auth.ts` — `useIsLoggedIn()` 훅 추가(마운트 후 `AUTH_STORAGE_KEY` 읽는 공통 패턴을 재사용 컴포넌트에서 쓰기 위함).
+  - `src/components/auth/GuestSaveProgressCard.tsx` (신규) — "간편 로그인 하고 이번 학습을 저장해보세요!" + Kakao 버튼 + 3개 기능 뱃지(학습 진행률 저장/완료한 학습 기록/취약 유형 분석) 카드를 공용 컴포넌트로 추출. 배경은 `style` prop으로 주입(퀴즈 결과는 그라데이션 배너, 학습 기록은 솔리드 `#1a2035` 오버레이 카드).
+  - `src/app/learn/[caseId]/call/quiz/page.tsx` — 위 배너 인라인 구현을 `GuestSaveProgressCard`로 교체.
+  - `src/app/(main)/record/page.tsx` — 게스트일 때 섹션마다 "로그인 후 이용 가능합니다" 버튼+모달을 띄우던 방식을, 실제 콘텐츠를 `backdrop-blur-md`로 흐리게 보여주고 그 위에 `GuestSaveProgressCard`를 중앙 오버레이로 띄우는 방식으로 변경(Figma의 블러+카드 패턴). `LoginPromptModal` 제거. 오버레이 카드 높이는 Figma 원본 프레임 값(217px)에 맞춰 `paddingBlock: "55px"`로 조정(`GuestSaveProgressCard`의 기본 패딩을 인라인 스타일로 덮어씀).
+  - `src/lib/case-meta.ts`는 변경 없음. `src/components/cards/CaseStatsGrid.tsx` — 완료율 셀은 회원의 실제 학습 기록 기준이라 게스트에게는 노출하지 않음(4칸→3칸, 빈 칸은 `aria-hidden` placeholder로 그리드 위치 유지). 이후 사용자 피드백으로 추천도를 왼쪽, 완료율을 오른쪽 칸으로 순서 변경.
+  - `src/components/cards/ScenarioCard.tsx` — "학습 완료" 배지와 버튼 문구("이어서 학습하기" 등)도 완료율과 동일하게 회원 전용 데이터라 게스트에게는 숨기고 버튼은 항상 "학습하기"로 고정.
+  - `src/app/(main)/learn/page.tsx` — 게스트에게는 "최근 학습한 사례" 배너(회원 진행 기록 기반)를 숨김.
+  - `src/app/(main)/home/page.tsx` — "전체 학습 진도율"/"오늘 학습 시간·완료 시나리오"/"이어서 학습하기" 섹션을 게스트에게 잠금(반투명+로그인 모달) 형태로 보여주던 것을, Figma 게스트 화면 기준으로 섹션 자체를 렌더링하지 않도록 변경. 인사말도 로그인 여부에 따라 "홍길동"/"게스트"로 표시.
+  - `src/components/cards/ContinueLearningCard.tsx` — home 페이지에서만 쓰이던 `locked`/`onLockedClick` prop이 더 이상 쓰이지 않아 제거.
+- 비고: Figma의 "게스트용" 검토 섹션(디자이너 주석 "게스트용은 이대로 진행하면 될 것 같아요")을 실제 앱과 대조한 결과 위와 같은 차이를 발견해 반영. 완료율/학습 완료 여부처럼 회원 전용 실제 데이터에 기반한 UI는 게스트에게 "잠금 표시"가 아니라 "숨김"으로 통일.
+
+## [2026-07-19] 학습 기록 "취약 유형" 뱃지를 한 줄에 3개씩 배치
+- 수정/생성 파일:
+  - `src/app/(main)/record/page.tsx` — 취약 유형 뱃지 컨테이너를 `flex flex-wrap`(내용 길이에 따라 줄바꿈)에서 `grid grid-cols-3`로 변경, 항상 한 줄에 3개씩 배치되도록 함. 좁아진 칼럼 폭 때문에 5글자 카테고리명("메신저사기" 등)이 두 줄로 줄바꿈되던 문제는 뱃지 내부 패딩을 줄이고 `whitespace-nowrap`을 추가해 해결. 뱃지가 grid 기본 stretch로 칼럼 전체 너비를 채워 오른쪽에 빈 공간이 남던 것은 `w-fit`으로 내용 크기만큼만 차지하도록 수정. 이후 패딩(`px-1.5`→`px-2`→`px-2.5`)을 단계적으로 키우고 그리드 가로 간격(`gap-2`→`gap-x-1.5`→`gap-x-1`)을 줄여 320px/375px 두 폭에서 잘림 없이 균형 잡히도록 조정.
+
+## [2026-07-20] 문자(메시지) 시뮬레이션 신규 구현 (US-58~64)
+- 수정/생성 파일:
+  - `src/types/index.ts` — `PhishingCase`에 `textMessages: string[]`(문자 시뮬레이션에서 순서대로 등장하는 사기범 발신 메시지), `textQuiz: QuizQuestion`(문자 시뮬레이션의 "어떻게 행동 하시겠습니까?" 2지선다 판단 퀴즈), `textFeedback: { correct; wrong }`(완료 직후 상단 요약 피드백 문구) 추가.
+  - `src/lib/mock-cases.ts` — 5개 케이스 전부에 위 3개 필드 채움(기존 phoneDialogue/quiz와 같은 시나리오를 문자 버전으로 각색).
+  - `src/lib/routes.ts` — `ROUTES.messageProgress(caseId)` 추가.
+  - `src/app/learn/[caseId]/message/progress/page.tsx` (신규) — 문자 시뮬레이션 진행/완료 화면. Figma(node 54:715 "메세지 확인중", 54:678/54:749 "완료 화면")를 기준으로 구현. TTS 없이 문자 메시지가 550ms 간격으로 하나씩 등장(`bubble-enter` 애니메이션 재사용), 전부 등장해야 2지선다 선택지가 활성화됨. 선택 즉시 배지가 "메세지 확인중"(빨강)→"시뮬레이션 완료"(파랑)로 바뀌고, 정답/오답에 따라 요약 피드백 문구 + `call/progress`의 완료 리뷰 카드와 동일한 패턴(선택 배지+정답 배지+설명)을 보여줌. "다시 하기"/"AI 분석 결과 보기"/"마무리 퀴즈 하러 가기" 버튼은 기존 `call/analysis`·`call/quiz` 라우트를 그대로 재사용(모드 구분 없이 caseId만으로 동작하는 공용 페이지라 신규 구현 불필요).
+  - `src/app/(main)/learn/[caseId]/page.tsx` — 지금까지 아무 동작이 없던 "문자로 시작" 버튼을 `ROUTES.messageProgress(caseId)`로 연결.
+- 비고: 사용자가 공유한 Figma 4개 프레임(54:715/54:678/54:749/54:797) 기준으로 구현. `call/analysis`·`call/quiz` 페이지는 원래 모드 독립적으로 설계되어 있어 그대로 재사용 가능함을 확인 후 중복 구현하지 않기로 결정.
+- 추가로 `AGENTS.md`의 "US-04~08 기록 탭 미구현" 표기가 실제로는 이미 구현되어 있어 오래전에 stale 해진 것을 발견, 함께 정정.
+
+## [2026-07-20] 문자 시뮬레이션을 전화 시뮬레이션과 동일한 구조로 조정
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/message/progress/page.tsx` — 메시지 등장 간격을 550ms → 1800ms로 늘려 더 천천히 하나씩 등장하도록 조정. 판단 퀴즈 카드를 메시지 스크롤 영역 안에 항상 렌더링(비활성화 스타일)하던 구조에서, `call/progress`의 `QuizCard`와 동일하게 **메시지가 전부 등장한 뒤에만 렌더링되고 스크롤 영역 밖(`shrink-0`)에 하단 고정**되는 구조로 변경. 완료 화면도 `call/progress`처럼 별도 `key`(`"messages"`/`"complete"`)를 준 독립 스크롤 영역으로 분리(리액트가 두 상태의 DOM을 재사용해 스크롤 위치가 새는 것을 방지하는, 이전에 전화 시뮬레이션에서 고쳤던 것과 동일한 패턴).
+- 비고: "전화 시뮬레이션이랑 완전히 똑같아야 한다"는 피드백에 따라 구조를 최대한 일치시킴. Playwright로 퀴즈 카드가 메시지 등장 완료 전에는 보이지 않는 것, 등장 간격이 실제로 늘어난 것, 완료 화면이 정상 동작하는 것을 확인.
+
+## [2026-07-20] 문자 시뮬레이션 퀴즈 등장 딜레이 추가 + 완료 화면에서 메시지 목록 제거
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/message/progress/page.tsx` — 마지막 메시지가 등장한 뒤 곧바로 퀴즈 카드가 뜨지 않고 1.2초(`QUIZ_DELAY_MS`) 대기 후 나타나도록 `showQuiz` 상태 추가. 완료(complete) 화면에서 메시지 목록을 제거 — `call/progress`의 완료 화면이 대화 내용 없이 리뷰 카드만 보여주는 것과 동일하게 맞춤(Figma에는 메시지가 남아있었지만, "전화 시뮬레이션이랑 완전히 똑같아야 한다"는 방향에 맞춰 제거).
+- 비고: Playwright로 마지막 메시지 등장 후 퀴즈가 약 1.2초 뒤에 나타나는 것, 완료 화면에 메시지 버블이 하나도 없는 것(`bubble-enter` 요소 0개)을 확인.
+
+## [2026-07-19] 학습 기록 화면 나머지 섹션 게이팅 + 게스트 학습 기록 저장 자체를 차단
+- 수정/생성 파일:
+  - `src/lib/progress.ts` — `recordCaseProgress`/`recordAnalysisAccuracy` 함수 내부에서 `AUTH_STORAGE_KEY`를 직접 확인해 게스트(비로그인)면 조용히 no-op. 호출부(call/progress, call/quiz, call/analysis)는 수정 불필요.
+  - `src/lib/daily-stats.ts` — `addTodaySeconds`도 동일하게 게스트는 저장하지 않도록 가드.
+  - `src/app/(main)/record/page.tsx` — "전체 학습 진행률"/"완료 시나리오 개수"/"완료 학습 조회"/"최근 진행한 학습" 섹션을 "취약 유형"과 동일한 방식(자물쇠 아이콘 + 로그인 모달)으로 게이팅. 이제 학습 기록 화면 전체가 회원 전용.
+- 비고: 유저스토리 US-56(학습 기록 저장)이 회원 전용으로 명시되어 있어, 단순히 진도율 "표시"만 막는 걸 넘어 게스트 시뮬레이션 진행 자체가 기록되지 않도록 저장 단계에서부터 차단하기로 사용자와 확인 후 결정. Playwright로 게스트 상태에서 시뮬레이션 진행 후 `localStorage.getItem("voiceshield-case-progress")`가 `null`인 것, 로그인 상태에서는 정상 저장되는 것을 각각 확인.
+  또한 `01. 유저스토리 - 시트1.pdf` 전체를 다시 검토해 "사례 목록 조회"(US-18) 등 게스트 체험(US-06)과 충돌하는 항목은 스프레드시트 오기로 판단해 게이팅하지 않기로 결정 — `AGENTS.md`에 근거 명시.
+
+## [2026-07-19] 홈 화면 진도율/통계/이어서 학습하기, 학습 기록 취약 유형에 회원 전용 게이팅 추가
+- 수정/생성 파일:
+  - `src/components/auth/LoginPromptModal.tsx` (신규) — 기존 `settings/page.tsx`에 인라인으로 있던 "로그인 후 이용 가능합니다" 모달을 공용 컴포넌트로 추출(`open`/`onClose`/`onLoggedIn` props). Kakao 버튼 클릭 시 `AUTH_STORAGE_KEY`를 직접 저장.
+  - `src/app/(main)/settings/page.tsx` — 인라인 모달 제거하고 `LoginPromptModal`로 교체(동작 동일, 코드만 정리).
+  - `src/components/cards/ContinueLearningCard.tsx` — `locked`/`onLockedClick` prop 추가. `locked`일 때 클릭을 가로채(`preventDefault`) 네비게이션 대신 콜백을 호출하고 `opacity-50`으로 표시.
+  - `src/app/(main)/home/page.tsx` — "전체 학습 진도율", "오늘 학습 시간/완료 시나리오", "이어서 학습하기"를 회원 전용으로 게이팅. 게스트에게는 자물쇠 아이콘 + "로그인 후 이용 가능합니다" 안내를 보여주고 클릭 시 `LoginPromptModal`을 띄움.
+  - `src/app/(main)/record/page.tsx` — "취약 유형" 섹션을 동일한 방식으로 회원 전용 게이팅.
+- 비고: `01. 유저스토리 - 시트1.pdf`의 US-11(최근 학습 이어하기)/US-12(학습 진행률 확인)/US-13(오늘의 학습 시간 확인)/US-14(완료한 시나리오 확인)/US-78(취약 유형 확인)이 모두 "회원만"으로 명시되어 있었는데, 지금까지는 게스트에게도 노출되고 있었음 — 이번에 유저스토리 기준으로 맞춤. 학습 기록의 나머지 섹션(전체 진행률/완료 학습 조회/최근 진행한 학습, US-76/77/79도 "회원만")은 이번 범위에서 제외했고 추후 필요 시 별도 처리.
+
+## [2026-07-19] 홈 화면 "오늘의 학습 진도율"을 "전체 학습 진도율"로 변경하고 실제 데이터 연결
+- 수정/생성 파일:
+  - `src/app/(main)/home/page.tsx` — 상단 진도율 섹션을 "오늘의 학습 진도율"(하드코딩 68%) + "오늘 완료: 68%"에서 "전체 학습 진도율"로 변경. `applyProgressOverrideToAll`로 전체 케이스 중 완료(`isCompleted`) 개수를 세어 `completedCaseCount / totalCaseCount` 기반 퍼센트로 프로그레스 바를 채우고, 우측에 "완료 수 / 전체 수"를 표시. "오늘 완료" 텍스트는 제거.
+- 비고: `record/page.tsx`의 "전체 학습 진행률" 섹션과 동일한 계산 로직 재사용. localStorage에 완료 케이스 2개를 심어 40%(2/5)로 정확히 반영되는 것 Playwright로 확인.
+
+## [2026-07-19] 취약 유형 뱃지를 화면 폭에 따라 자연스럽게 3~4개씩 배치
+- 수정/생성 파일:
+  - `src/app/(main)/record/page.tsx` — 처음엔 `grid-cols-4`로 고정했으나, 좁은 모바일 폭에서 4칼럼을 억지로 맞추다 보니 뱃지 패딩을 키울 여유가 없다는 문제가 있었음(칼럼 폭 자체가 좁아 패딩을 키우면 다시 잘림). `grid-template-columns: repeat(auto-fill, minmax(90px, 1fr))`로 바꿔 칼럼 개수를 고정하지 않고 화면 폭에 맞게 브라우저가 자동으로 결정하도록 변경 — 실측 결과 320px에서는 2개, 360~414px(대부분의 모바일 폭)에서는 3개, 500px 이상에서는 4개가 한 줄에 들어가며, 칼럼 수가 적을수록 남는 공간이 뱃지 패딩(반응형 `cqw` 기반)에 자연스럽게 반영되어 모바일에서도 패딩이 커 보임. 모든 구간에서 잘림 없음(diff=0) 확인.
+
+## [2026-07-19] 모바일에서 대사 재생이 특정 줄에서 멈춘 채 "다시 듣기" 아이콘이 계속 도는 문제 방지
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — `playLine`의 오디오/브라우저 TTS 재생 대기에 15초 타임아웃(`withTimeout`)을 추가. 모바일(특히 iOS Safari)에서 `speechSynthesis`의 `onend`/`onerror`가 아예 발화하지 않는 경우가 있어, 이때 `await`가 영원히 끝나지 않으면 해당 줄의 "다시 듣기" 스핀 아이콘이 멈추지 않고 대화 진행 루프 전체가 멈춰버렸음.
+- 비고: "두 번째 대사부터 도돌이표가 계속 돈다 / 새로고침하면 첫 번째부터 돈다" 제보 기반. Playwright(헤드리스 Chromium)로는 재현되지 않아(자동재생 제약이 실기기보다 느슨함) 근본 원인을 100% 확증하지는 못했고, 재발 방지용 타임아웃 안전장치로 방어. 실기기에서 재현되면 추가 확인 필요.
+
+## [2026-07-19] 전화 시뮬레이션 종료(X) 버튼 크기 반응형 조정
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/call/progress/page.tsx`, `call/quiz/page.tsx`, `call/analysis/page.tsx` — 종료 버튼 아이콘 크기를 `clamp(15px, 4.5cqw, 21px)` → `clamp(18px, 5cqw, 22px)`로 조정(좁은 화면에서 최소 크기가 너무 작았음, 최대 크기는 기존과 비슷하게 유지).
+
+## [2026-07-19] 홈 화면 "오늘 학습 시간"/"오늘 완료 시나리오"를 실제 데이터에 연결
+- 수정/생성 파일:
+  - `src/lib/daily-stats.ts` (신규) — `voiceshield-daily-study-seconds` localStorage 키에 날짜별 학습 체류 시간(초)을 누적. `useStudyTimeTracker()` 훅을 학습 화면에 붙이면 10초 주기 flush + `visibilitychange`로 오늘 날짜에 시간을 누적하고, `getTodayStudyMinutes()`로 분 단위 조회.
+  - `src/lib/progress.ts` — `StoredCaseProgress`에 `completedAt?: number` 추가(처음 완료된 시각만 기록, 재방문 시 갱신 안 함), `getTodayCompletedCount()` 추가.
+  - `src/app/learn/[caseId]/call/progress/page.tsx`, `call/quiz/page.tsx`, `call/analysis/page.tsx` — `useStudyTimeTracker()` 호출 추가(전화 시뮬레이션 각 단계에 머무는 시간을 실제 학습 시간으로 집계).
+  - `src/app/(main)/home/page.tsx` — "오늘 학습 시간 (분)"/"오늘 완료 시나리오" 하드코딩 값(12, 3)을 `getTodayStudyMinutes()`/`getTodayCompletedCount()` 실제 값으로 교체.
+- 비고: "오늘의 학습 진도율"(68%, 68/100 프로그레스 바)은 이번에 다루지 않음 — 별도 요청 시 진행. Playwright로 localStorage를 직접 세팅해 완료 시각/누적 시간이 홈 화면 숫자에 정확히 반영되는 것 확인.
+
+## [2026-07-19] 학습 종료 시 오디오가 계속 재생되던 버그 수정
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/call/progress/page.tsx` — `exitedRef`를 추가해 "학습 종료" 확인 시 `true`로 설정하고, 대화 재생 루프(`runDialogue`)와 `playLine`이 이 플래그를 확인해 즉시 멈추도록 변경.
+- 비고: `router.push()`는 페이지를 즉시 언마운트하지 않으므로, 종료 버튼이 현재 재생 중인 오디오만 멈추고 진행 중이던 `runDialogue`의 `for` 루프는 그대로 다음 대사로 넘어가 새 오디오를 재생하는 레이스 컨디션이 실제로 있었다. Playwright로 `HTMLMediaElement.prototype.play/pause`를 몬키패치해 종료 클릭 후에도 새 `play()` 호출이 발생하는 것을 직접 확인 후 수정, 재발하지 않음을 재확인.
+
+## [2026-07-19] 마무리 퀴즈 결과 화면에서 오답 X 아이콘 제거
+- 수정/생성 파일:
+  - `src/app/learn/[caseId]/call/quiz/page.tsx` — 학습 흐름의 마지막 화면(마무리 퀴즈 결과)에서만 오답 선택 시 표시되던 `MdCancel`(X) 아이콘 제거, 정답일 때의 체크 아이콘만 유지.
+- 비고: 실시간 QuizCard(전화 시뮬레이션 중 판단 퀴즈)와 진행 화면 완료 카드는 X 아이콘 유지 — 마지막 페이지만 지워달라는 요청이었음.
+
 ## [2026-07-18] 학습하기 화면 카테고리 태그 반응형화
 - 수정/생성 파일:
   - `src/components/learn/CategoryTagRow.tsx` — 태그 간 간격(`gap-2.5`)과 각 태그의 좌우/상하 패딩·글자 크기를 고정값에서 `clamp()` 기반 반응형으로 변경.

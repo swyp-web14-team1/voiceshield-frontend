@@ -13,12 +13,20 @@ import { getStoredTtsPreference, prefetchTts } from "@/lib/tts";
 import { WAVEFORM_BAR_PATHS } from "@/lib/waveform-bars";
 import { saveAnalysisInput } from "@/lib/analysis";
 import { recordCaseProgress } from "@/lib/progress";
+import { useStudyTimeTracker } from "@/lib/daily-stats";
 import { QuizCard } from "@/components/learn/QuizCard";
 import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
 
 type Phase = "dialogue" | "quiz" | "complete";
 
 const HEADER_GRADIENT = "linear-gradient(165deg, #1a2035 0%, #2d1f4e 100%)";
+// 오디오 재생 대사 1개당 최대 대기 시간. 모바일 브라우저(특히 iOS Safari)에서 speechSynthesis의
+// onend/onerror가 아예 발화하지 않는 경우가 실제로 있어, 이 시간이 지나면 강제로 다음으로 넘어간다.
+const PLAYBACK_TIMEOUT_MS = 15_000;
+
+function withTimeout(promise: Promise<void>, ms: number): Promise<void> {
+  return Promise.race([promise, new Promise<void>((resolve) => setTimeout(resolve, ms))]);
+}
 
 function CallWaveform({ active }: { active: boolean }) {
   return (
@@ -58,6 +66,8 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
   const phishingCase = getCaseById(caseId);
   if (!phishingCase) notFound();
 
+  useStudyTimeTracker();
+
   const [phase, setPhase] = useState<Phase>("dialogue");
   const [quizIndex, setQuizIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() => Array(phishingCase.quiz.length).fill(null));
@@ -68,6 +78,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mutedRef = useRef(muted);
   const playTokenRef = useRef(0);
+  const exitedRef = useRef(false);
   const lineRefs = useRef<Array<HTMLDivElement | null>>([]);
   const dialogueScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -115,7 +126,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
 
   const playLine = async (index: number, text: string) => {
     const token = ++playTokenRef.current;
-    if (mutedRef.current) return;
+    if (mutedRef.current || exitedRef.current) return;
     audioRef.current?.pause();
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setPlayingLineIndex(index);
@@ -141,7 +152,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       });
       await audio.play();
       if (token !== playTokenRef.current) throw new Error("superseded");
-      await ended;
+      await withTimeout(ended, PLAYBACK_TIMEOUT_MS);
     } catch {
 
       if (audio) {
@@ -151,16 +162,19 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
       if (token !== playTokenRef.current) return;
       const { rate } = getStoredTtsPreference();
-      await new Promise<void>((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = "ko-KR";
-        utterance.rate = rate;
-        const koreanVoice = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith("ko"));
-        if (koreanVoice) utterance.voice = koreanVoice;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
-        window.speechSynthesis.speak(utterance);
-      });
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = "ko-KR";
+          utterance.rate = rate;
+          const koreanVoice = window.speechSynthesis.getVoices().find((v) => v.lang.startsWith("ko"));
+          if (koreanVoice) utterance.voice = koreanVoice;
+          utterance.onend = () => resolve();
+          utterance.onerror = () => resolve();
+          window.speechSynthesis.speak(utterance);
+        }),
+        PLAYBACK_TIMEOUT_MS,
+      );
     } finally {
       if (url) URL.revokeObjectURL(url);
       if (token === playTokenRef.current) {
@@ -177,7 +191,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
 
     const runDialogue = async () => {
       for (let i = 0; i < phishingCase.phoneDialogue.length; i++) {
-        if (cancelled) return;
+        if (cancelled || exitedRef.current) return;
         setRevealedCount(i + 1);
         const line = phishingCase.phoneDialogue[i];
         if (line.speaker === "caller") {
@@ -185,8 +199,9 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
         } else {
           await new Promise((resolve) => setTimeout(resolve, 900));
         }
+        if (cancelled || exitedRef.current) return;
       }
-      if (!cancelled) setPhase("quiz");
+      if (!cancelled && !exitedRef.current) setPhase("quiz");
     };
 
     runDialogue();
@@ -294,7 +309,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
           onClick={() => setShowExitModal(true)}
           className="absolute top-5 left-6.5 cursor-pointer text-white/90"
         >
-          <FiX size="clamp(15px, 4.5cqw, 21px)" />
+          <FiX size="clamp(18px, 5cqw, 22px)" />
         </button>
         {phase !== "complete" && (
           <button
@@ -492,6 +507,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       <ExitConfirmModal
         open={showExitModal}
         onExit={() => {
+          exitedRef.current = true;
           playTokenRef.current++;
           audioRef.current?.pause();
           if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();

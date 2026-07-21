@@ -40,6 +40,9 @@ export interface PhishingCase {
   callerLabel: string; // 전화 시뮬레이션에서 발신자로 표시할 이름 (예: "시청 주무관 사칭범")
   quiz: QuizQuestion[]; // 전화 시뮬레이션 중간에 등장하는 판단 퀴즈
   finalQuiz: QuizQuestion; // 시뮬레이션 완료 후 "마무리 퀴즈"에서 등장하는 문제 (같은 주제의 다른 문항)
+  textMessages: string[]; // 문자 시뮬레이션에서 순서대로 등장하는 문자 메시지(모두 사기범 발신)
+  textQuiz: QuizQuestion; // 문자 시뮬레이션의 판단 퀴즈("어떻게 행동 하시겠습니까?", 2지선다)
+  textFeedback: { correct: string; wrong: string }; // 문자 시뮬레이션 완료 직후 상단에 보여줄 요약 피드백 문구
 }
 
 export interface LearningProgress {

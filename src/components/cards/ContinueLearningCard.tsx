@@ -23,6 +23,7 @@ export function ContinueLearningCard({
   const isLight = variant === "light";
   const category = CATEGORY_META[phishingCase.category];
   const CategoryIcon = category.Icon;
+  const iconBg = category.bg;
 
   if (variant === "compact") {
     return (
@@ -68,7 +69,7 @@ export function ContinueLearningCard({
       <div className="relative flex items-center gap-4">
         <div
           className="flex size-16 shrink-0 items-center justify-center rounded-[10px]"
-          style={{ backgroundColor: category.bg }}
+          style={{ backgroundColor: iconBg }}
         >
           <CategoryIcon className="size-7 text-white" />
         </div>

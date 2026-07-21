@@ -8,6 +8,7 @@ import { RiShiningFill, RiShiningLine } from "react-icons/ri";
 import { ROUTES } from "@/lib/routes";
 import { readAnalysisInput } from "@/lib/analysis";
 import { recordAnalysisAccuracy } from "@/lib/progress";
+import { useStudyTimeTracker } from "@/lib/daily-stats";
 import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
 import type { AiAnalysisResult, AnalyzeRequest } from "@/types";
 
@@ -26,6 +27,7 @@ export default function AiAnalysisPage({ params }: { params: Promise<{ caseId: s
   const { caseId } = use(params);
   const router = useRouter();
 
+  useStudyTimeTracker();
 
   const [input, setInput] = useState<AnalyzeRequest | null>(null);
   const [status, setStatus] = useState<"loading" | "error" | "done">("loading");
@@ -92,7 +94,7 @@ export default function AiAnalysisPage({ params }: { params: Promise<{ caseId: s
           onClick={() => setShowExitModal(true)}
           className="absolute top-5 left-6.5 cursor-pointer text-white/90"
         >
-          <FiX size="clamp(15px, 4.5cqw, 21px)" />
+          <FiX size="clamp(18px, 5cqw, 22px)" />
         </button>
         <RiShiningLine size={35} />
         <div className="flex h-[clamp(26px,7cqw,32px)] items-center justify-center rounded-full border border-white/50 bg-white/20 px-[clamp(10px,3cqw,14px)]">

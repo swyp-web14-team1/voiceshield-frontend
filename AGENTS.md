@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # 보이스쉴드 (VoiceShield) 프로젝트
 
-보이스피싱 예방 교육을 위한 Next.js PWA. 실제 시나리오 학습, 긴급 신고 안내, TTS 기반 음성 시뮬레이션, AI 기반 학습 결과 분석을 제공한다. 현재 **프론트엔드 + 목데이터** 단계이며, 별도의 자체 백엔드 서버/DB는 없다 — `POST /api/tts`(Google Cloud TTS), `POST /api/analyze`(Google Gemini) 두 라우트만 실제 외부 서비스와 통신하고, 나머지는 전부 목데이터 또는 `localStorage`/`sessionStorage`로 동작한다.
+보이스피싱 예방 교육을 위한 Next.js PWA. 실제 시나리오 학습, 긴급 신고 안내, TTS 기반 음성 시뮬레이션, 문자 기반 메시지 시뮬레이션, AI 기반 학습 결과 분석을 제공한다. 현재 **프론트엔드 + 목데이터** 단계이며, 별도의 자체 백엔드 서버/DB는 없다 — `POST /api/tts`(Google Cloud TTS), `POST /api/analyze`(Google Gemini) 두 라우트만 실제 외부 서비스와 통신하고, 나머지는 전부 목데이터 또는 `localStorage`/`sessionStorage`로 동작한다.
 
 ## 기술 스택
 
@@ -35,26 +35,29 @@ src/
       learn/
         page.tsx             # US-03 학습하기 (카테고리 필터, useSearchParams → 반드시 Suspense로 감쌀 것)
         [caseId]/page.tsx    # US-03 학습 시나리오 상세
-        [caseId]/call/analysis/page.tsx  # US-03 전화 시뮬레이션 완료 후 AI 분석 결과 화면
-        [caseId]/call/quiz/page.tsx      # US-03 마무리 퀴즈 (같은 시나리오의 다른 문항, 결과 화면에 추천학습·게스트 로그인 유도 배너 포함)
+        [caseId]/call/analysis/page.tsx  # US-03/US-58~64 전화·문자 시뮬레이션 완료 후 AI 분석 결과 화면(모드 공용)
+        [caseId]/call/quiz/page.tsx      # US-03/US-58~64 마무리 퀴즈 (같은 시나리오의 다른 문항, 결과 화면에 추천학습·게스트 로그인 유도 배너 포함, 모드 공용)
+        [caseId]/message/progress/page.tsx  # US-58~64 문자 시뮬레이션(메시지 진행/완료 화면) — TTS 없이 메시지가 순차 등장(bubble-enter, 550ms 간격), 완료 시 call/analysis·call/quiz를 그대로 재사용(모드 구분 없는 공용 라우트라 caseId만 있으면 동작)
       emergency/page.tsx     # US-09 긴급 신고 안내
       settings/
         page.tsx             # US-10 설정
         account/page.tsx     # US-10 회원 탈퇴 (탈퇴 사유 → 완료 확인 모달)
   components/
     layout/                  # BackHeader(모든 하위 페이지 공통 뒤로가기 헤더), BottomNav
-    cards/                   # ScenarioCard, ContinueLearningCard, RecommendedCard, CaseStatsGrid
+    cards/                   # ScenarioCard(게스트는 완료율/학습완료 배지 숨김), ContinueLearningCard, RecommendedCard, CaseStatsGrid(게스트는 완료율 셀 숨김)
     learn/                   # CategoryTagRow, QuizCard(전화 시뮬레이션 중 판단 퀴즈 — 선택 즉시 정답/오답 표시), ExitConfirmModal(통화 시뮬레이션 3화면 공용 "학습을 종료하시겠습니까?" 모달) 등 학습 페이지 전용 컴포넌트
+    auth/                    # LoginPromptModal — 회원 전용 기능(설정의 매일 학습 알림, 홈/기록의 진도율·통계·취약유형 등)을 게스트가 시도할 때 뜨는 공용 "로그인 후 이용 가능합니다" 모달. Kakao 로그인 버튼 클릭 시 `AUTH_STORAGE_KEY`를 직접 설정하고 `onLoggedIn` 콜백 호출
     icons/                   # home-icons.tsx, kakao-icons.tsx 등 커스텀 SVG 아이콘
     providers/               # FontScaleProvider — localStorage 기반 전역 글자 크기 배율
   lib/
     routes.ts                # 전체 라우트 상수(US ID 주석 포함) — 경로는 항상 여기서 가져다 쓸 것
-    mock-cases.ts             # PhishingCase 목데이터 (실제 DB 없음, 여기가 유일한 소스). 각 케이스는 `quiz`(전화 시뮬레이션 중 판단 퀴즈, 2문항)와 `finalQuiz`(마무리 퀴즈, 같은 주제의 다른 문항 1개)를 모두 가진다 — 새 케이스 추가 시 둘 다 채울 것
+    mock-cases.ts             # PhishingCase 목데이터 (실제 DB 없음, 여기가 유일한 소스). 각 케이스는 `quiz`(전화 시뮬레이션 중 판단 퀴즈, 2문항)와 `finalQuiz`(마무리 퀴즈, 같은 주제의 다른 문항 1개), `textMessages`(문자 시뮬레이션에서 순서대로 등장하는 문자 메시지, 전부 사기범 발신)·`textQuiz`(문자 시뮬레이션의 "어떻게 행동 하시겠습니까?" 2지선다 판단 퀴즈)·`textFeedback`(문자 시뮬레이션 완료 직후 상단 요약 피드백, correct/wrong 문구)를 모두 가진다 — 새 케이스 추가 시 전부 채울 것
     case-meta.ts               # 카테고리/난이도 라벨·색상 매핑 (CATEGORY_META, DIFFICULTY_META)
     auth.ts                   # AUTH_STORAGE_KEY — localStorage 기반 mock 로그인 플래그
     sound.ts                   # playFeedbackTone — 퀴즈 정답/오답 효과음. 음원 파일 없이 Web Audio API 오실레이터로 합성 (QuizCard, 마무리 퀴즈 공용)
     analysis.ts                # sessionStorage 기반 AI 분석 입력값 저장/조회 (call/progress → call/analysis 화면 간 데이터 전달)
-    progress.ts                 # localStorage 기반 케이스별 실제 학습 진행률 추적 (voiceshield-case-progress). `recordCaseProgress`로 call/progress·call/quiz에서 단계 진입 시 기록(dialogue 30%→quiz 60%→complete 90%→finalQuiz 100%+완료 처리), `recordAnalysisAccuracy`로 call/analysis에서 AI 분석 완료 시 퀴즈 정답률을 기록. `applyProgressOverride`(All)로 mock-cases.ts의 정적 completionRate/isCompleted를 실제 값으로 덮어씀. 홈/학습하기 화면의 "이어서 학습하기"·"최근 학습한 사례", 기록 화면의 전체 진행률/최근 진행한 학습이 모두 이 기록 기준으로 계산됨. 기록 화면의 "취약 유형"은 AI 분석을 본 적 있는 카테고리는 그 정답률(accuracy, <70이면 취약)로, 아직 분석을 안 본 카테고리는 completionRate(<50이면 취약)로 판단.
+    progress.ts                 # localStorage 기반 케이스별 실제 학습 진행률 추적 (voiceshield-case-progress). `recordCaseProgress`로 call/progress·call/quiz에서 단계 진입 시 기록(dialogue 30%→quiz 60%→complete 90%→finalQuiz 100%+완료 처리), `recordAnalysisAccuracy`로 call/analysis에서 AI 분석 완료 시 퀴즈 정답률을 기록. **둘 다 게스트(비로그인)일 때는 내부에서 `AUTH_STORAGE_KEY`를 확인해 조용히 no-op** — 유저스토리 US-56(학습 기록 저장)이 회원 전용이라 게스트의 진행은 아예 기록되지 않는다(호출부에서 매번 isLoggedIn 체크할 필요 없음). `applyProgressOverride`(All)로 mock-cases.ts의 정적 completionRate/isCompleted를 실제 값으로 덮어씀. 홈/학습하기 화면의 "이어서 학습하기"·"최근 학습한 사례", 기록 화면의 전체 진행률/최근 진행한 학습이 모두 이 기록 기준으로 계산됨. 기록 화면의 "취약 유형"은 AI 분석을 본 적 있는 카테고리는 그 정답률(accuracy, <70이면 취약)로, 아직 분석을 안 본 카테고리는 completionRate(<50이면 취약)로 판단.
+    daily-stats.ts               # localStorage 기반 오늘 날짜별 학습 체류 시간 추적 (voiceshield-daily-study-seconds). `useStudyTimeTracker()` 훅을 call/progress·call/quiz·call/analysis에 붙여 10초 주기 flush + visibilitychange로 누적. `addTodaySeconds`도 progress.ts와 동일하게 게스트는 저장하지 않음.
   types/index.ts               # 전역 타입 (PhishingCase, CaseCategory, CaseDifficulty, AnalyzeRequest, AiAnalysisResult 등)
 public/
   manifest.json, logo.svg, learn-*.png/svg 등 PWA·정적 에셋
@@ -87,6 +90,7 @@ public/
 - 새 전역 설정에서 FOUC(깜빡임)가 문제되면 `FontScaleProvider`의 패턴(마운트 전 inline script + `suppressHydrationWarning`)을 따른다.
 - localStorage 값을 useEffect로 "읽기"와 "쓰기"를 분리하면 마운트 시점에 레이스 컨디션이 생길 수 있다 (읽기 effect의 상태 업데이트가 반영되기 전에 쓰기 effect가 구값으로 덮어씀). 쓰기는 상태를 변경하는 이벤트 핸들러 안에서 직접 수행한다.
 - `localStorage`/`sessionStorage` 값을 **`useState(() => 읽기)` 같은 lazy initializer로 렌더링 중 바로 읽으면 안 된다** — 서버 렌더링 시점에는 이 값이 항상 비어있어(브라우저 전용 API), 서버가 렌더링한 결과와 클라이언트 첫 렌더 결과가 달라지는 하이드레이션(hydration) 에러가 발생한다 (`call/analysis/page.tsx`에서 실제로 겪은 버그). 대신 초기 상태값은 서버·클라이언트 동일하게 고정하고(예: `useState(false)`, `useState("loading")`), 실제 값은 마운트 후 `useEffect` 안에서 읽어 `setState`한다 — 이때 `react-hooks/set-state-in-effect` 린트 규칙에 걸리는 것은 정상이며, 불가피한 경우이므로 `// eslint-disable-next-line react-hooks/set-state-in-effect -- ...` 주석으로 이유를 남기고 억제한다.
+- **`router.push()`는 현재 페이지를 즉시 언마운트하지 않는다** — 오디오/타이머처럼 진행 중인 비동기 루프를 "나가기" 버튼 클릭 시 멈추려면, `useEffect` 클린업(언마운트 시점)에만 의존하지 말고 클릭 핸들러에서 직접 설정하는 `exitedRef` 같은 ref 플래그를 루프가 매 반복마다 확인하게 해야 한다 (`call/progress/page.tsx`의 `runDialogue` 루프 — 종료 버튼을 눌러도 진행 중이던 대화 재생 루프가 다음 대사 오디오를 새로 재생하던 버그를 이 패턴으로 수정).
 
 ## 기능 범위 (US ID는 `01. 유저스토리 - 시트1.pdf` 기준, `lib/routes.ts` 주석과 1:1 매핑)
 
@@ -95,7 +99,9 @@ public/
 | US-01 | 카카오 로그인 / 게스트 시작 | `/` | mock 구현 (localStorage 플래그만, 실제 OAuth 없음) |
 | US-02 | 메인 화면 (진도율, 카테고리별 학습, 추천학습) | `/home` | 구현 |
 | US-03 | 학습하기(카테고리 필터) / 시나리오 상세 | `/learn`, `/learn/[caseId]` | 구현 |
-| US-04~08 | 미확인 (기록 탭 포함, 유저스토리 문서 재확인 필요) | `기록` 탭(`BottomNav`에서 `placeholder: true`) | 미구현 |
+| US-45~57 | 전화(음성) 시뮬레이션 (수신/진행/판단 퀴즈/완료/마무리 퀴즈/AI 분석) | `/learn/[caseId]/call/*` | 구현 |
+| US-58~64 | 문자(메시지) 시뮬레이션 (진행/판단 퀴즈/완료) — 마무리 퀴즈·AI 분석은 음성 모드와 동일 라우트(`call/quiz`, `call/analysis`) 재사용 | `/learn/[caseId]/message/progress` | 구현 |
+| US-76~79 | 학습 기록 (전체 진행률/완료 학습 조회/취약 유형/최근 진행한 학습) | `/record` | 구현 (전부 회원 전용 게이팅) |
 | US-09 | 긴급 신고 안내 (112/1332, 대응·예방 수칙) | `/emergency` | 구현 |
 | US-10 | 설정 (글자 크기, TTS, 알림, 로그아웃/회원탈퇴) | `/settings`, `/settings/account` | 구현 |
 
@@ -124,8 +130,13 @@ public/
 |------|-----------|
 | 홈, 학습하기, 시나리오 상세, 긴급 신고 안내 | 학습자(전체) — 게스트도 이용 가능 |
 | 글자 크기 조정, TTS 속도/음성 설정 | 학습자(전체) |
-| 매일 학습 알림 (토글·시간 설정·알림 예약) | 회원 전용 — 게스트는 비활성화 + 로그인 안내 모달 |
+| 매일 학습 알림 (토글·시간 설정·알림 예약) | 회원 전용 — 게스트에게는 설정 화면에서 카드 자체를 노출하지 않음(완전히 숨김) |
+| 홈 화면 "전체 학습 진도율", "오늘 학습 시간/완료 시나리오", "이어서 학습하기" | 회원 전용 — 게스트에게는 섹션 자체를 노출하지 않음(Figma 게스트 화면 기준, 잠금 표시 대신 완전히 숨김). 학습하기 목록의 "최근 학습한 사례" 배너, 시나리오 카드의 완료율/학습완료 배지도 동일하게 게스트에게 숨김 (유저스토리 US-11~14) |
+| 학습 기록 화면 전체(전체 진행률/완료 시나리오 개수/완료 학습 조회/취약 유형/최근 진행한 학습) | 회원 전용 — 게스트에게는 실제 콘텐츠를 블러 처리해 보여주고 그 위에 로그인 유도 카드를 오버레이(Figma 게스트 화면 기준, 유저스토리 US-76~79) |
+| 학습 진행률/오늘 학습 시간 자체의 저장(`lib/progress.ts`, `lib/daily-stats.ts`) | 회원 전용 — 게스트는 시뮬레이션을 진행해도 기록이 저장되지 않음(유저스토리 US-56). 로그인하는 순간부터 기록이 쌓이기 시작 |
 | 회원 탈퇴 | 회원 전용 |
+
+**의도적으로 게이팅하지 않은 것**: 유저스토리 문서에는 "사례 목록 조회"(US-18)·"난이도 확인"(US-20)·"학습 완료 여부 확인"(US-22)도 회원만으로 적혀있지만, 이는 게스트 체험(US-06 "비회원 체험")과 정면 충돌하고 위 "학습자(전체)" 정책과도 모순되어 스프레드시트 오기로 판단, 적용하지 않았다. 학습하기 목록/시나리오 상세/전화·문자 시뮬레이션 자체는 계속 게스트에게 완전히 열려 있다.
 
 ## 개발 명령어
 

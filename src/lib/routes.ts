@@ -13,6 +13,7 @@ export const ROUTES = {
   callProgress: (caseId: string) => `/learn/${caseId}/call/progress`, // US-03 전화 시뮬레이션(통화 진행/퀴즈/완료 화면)
   callAnalysis: (caseId: string) => `/learn/${caseId}/call/analysis`, // US-03 전화 시뮬레이션(AI 분석 결과 화면)
   callQuiz: (caseId: string) => `/learn/${caseId}/call/quiz`, // US-03 전화 시뮬레이션(마무리 퀴즈 화면)
+  messageProgress: (caseId: string) => `/learn/${caseId}/message/progress`, // US-58~64 문자 시뮬레이션(메신저 진행/완료 화면) — 마무리 퀴즈·AI 분석은 callQuiz/callAnalysis 재사용
 
   record: "/record", // US-04~08 학습 기록
 

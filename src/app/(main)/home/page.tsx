@@ -5,17 +5,25 @@ import Link from "next/link";
 import { FiBookOpen } from "react-icons/fi";
 import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
 import { AiOutlineStock } from "react-icons/ai";
+import { GoOrganization } from "react-icons/go";
 import {
   CategoryDeliveryIcon,
   CategoryFamilyIcon,
-  CategoryGovernmentIcon,
   CategoryMessengerIcon,
 } from "@/components/icons/home-icons";
-import { DIFFICULTY_META } from "@/lib/case-meta";
+import { DIFFICULTY_META, INSTITUTION_ICON_SIZE } from "@/lib/case-meta";
 import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
 import { RecommendedCard } from "@/components/cards/RecommendedCard";
 import { ROUTES } from "@/lib/routes";
-import { applyProgressOverride, readProgressSnapshot, type ProgressSnapshot } from "@/lib/progress";
+import { useIsLoggedIn } from "@/lib/auth";
+import {
+  applyProgressOverride,
+  applyProgressOverrideToAll,
+  getTodayCompletedCount,
+  readProgressSnapshot,
+  type ProgressSnapshot,
+} from "@/lib/progress";
+import { getTodayStudyMinutes } from "@/lib/daily-stats";
 import type { CaseCategory } from "@/types";
 
 const DEFAULT_CONTINUE_CASE_ID = "institution-01";
@@ -30,7 +38,7 @@ const CATEGORY_TILES: {
   bg: string;
   iconSize?: string;
 }[] = [
-  { label: "기관사칭", category: "institution", Icon: CategoryGovernmentIcon, bg: "rgba(138,155,188,0.44)" },
+  { label: "기관사칭", category: "institution", Icon: GoOrganization, bg: "#2b7fff", iconSize: INSTITUTION_ICON_SIZE },
   { label: "가족사기", category: "family", Icon: CategoryFamilyIcon, bg: "#ff2056" },
   { label: "택배사기", category: "delivery", Icon: CategoryDeliveryIcon, bg: "#fe9a00" },
   { label: "투자사기", category: "investment", Icon: AiOutlineStock, bg: "#00bc7d", iconSize: "clamp(17px, 4.8cqw, 24px)" },
@@ -44,51 +52,74 @@ export default function HomePage() {
   // localStorage 기반 진행 기록은 서버에서 읽을 수 없으므로, 초기값은 서버·클라이언트 동일하게 빈 스냅샷으로 고정하고
   // 실제 값은 마운트 후 useEffect에서 읽는다 (하이드레이션 불일치 방지).
   const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
+  const [todayStudyMinutes, setTodayStudyMinutes] = useState(0);
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const isLoggedIn = useIsLoggedIn();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
     setProgress(readProgressSnapshot());
+    setTodayStudyMinutes(getTodayStudyMinutes());
+    setTodayCompletedCount(getTodayCompletedCount());
   }, []);
 
   const continueCaseId = progress.recentInProgressCaseId ?? DEFAULT_CONTINUE_CASE_ID;
   const continueCase = applyProgressOverride(getCaseById(continueCaseId)!, progress);
+
+  const casesWithProgress = applyProgressOverrideToAll(progress);
+  const totalCaseCount = casesWithProgress.length;
+  const completedCaseCount = casesWithProgress.filter((c) => c.isCompleted).length;
+  const overallProgressPercent =
+    totalCaseCount > 0 ? Math.round((completedCaseCount / totalCaseCount) * 100) : 0;
 
   return (
     <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3.5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">
       <section className="flex flex-col gap-1 rounded-xl bg-white p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
         <p className="text-xs font-medium text-[#64748B]">피싱안전지킴이</p>
         <h1 className="text-xl font-bold text-[#1a2332]">
-          안녕하세요, <span className="text-blue-600">홍길동</span> 님!
+          안녕하세요, <span className="text-blue-600">{isLoggedIn ? "홍길동" : "게스트"}</span> 님!
         </h1>
-        <p className="mt-2.25 text-sm text-slate-500">오늘의 학습 진도율</p>
-        <div className="mt-0.5 h-2 w-full overflow-hidden rounded-full bg-[#e6eaf0]">
-          <div className="h-2 w-[68%] rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
-        </div>
-        <div className="mt-1 flex items-center justify-between">
-          <span className="text-xs text-slate-500">오늘 완료: 68%</span>
-          <span className="text-xs font-bold text-blue-600">68 / 100</span>
-        </div>
+        {isLoggedIn && (
+          <>
+            <p className="mt-2.25 text-sm text-slate-500">전체 학습 진도율</p>
+            <div className="mt-0.5 h-2 w-full overflow-hidden rounded-full bg-[#e6eaf0]">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-400"
+                style={{ width: `${overallProgressPercent}%` }}
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-end">
+              <span className="text-xs font-bold text-blue-600">
+                {completedCaseCount} / {totalCaseCount}
+              </span>
+            </div>
+          </>
+        )}
       </section>
 
-      <section className="flex gap-3">
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-white p-4 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
-          <p className="text-3xl font-bold text-blue-600">12</p>
-          <p className="text-xs font-semibold text-slate-500">오늘 학습 시간 (분)</p>
-        </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-white p-4 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
-          <p className="text-3xl font-bold text-orange-500">3</p>
-          <p className="text-xs font-semibold text-slate-500">오늘 완료 시나리오</p>
-        </div>
-      </section>
+      {isLoggedIn && (
+        <section className="flex gap-3">
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-white p-4 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
+            <p className="text-3xl font-bold text-blue-600">{todayStudyMinutes}</p>
+            <p className="text-xs font-semibold text-slate-500">오늘 학습 시간 (분)</p>
+          </div>
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-white p-4 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
+            <p className="text-3xl font-bold text-orange-500">{todayCompletedCount}</p>
+            <p className="text-xs font-semibold text-slate-500">오늘 완료 시나리오</p>
+          </div>
+        </section>
+      )}
 
-      <ContinueLearningCard
-        heading="이어서 학습하기"
-        href={ROUTES.scenario(continueCase.id)}
-        phishingCase={continueCase}
-        difficultyLabel={DIFFICULTY_META[continueCase.difficulty].label}
-        difficultyColor={DIFFICULTY_META[continueCase.difficulty].bg}
-        variant="light"
-      />
+      {isLoggedIn && (
+        <ContinueLearningCard
+          heading="이어서 학습하기"
+          href={ROUTES.scenario(continueCase.id)}
+          phishingCase={continueCase}
+          difficultyLabel={DIFFICULTY_META[continueCase.difficulty].label}
+          difficultyColor={DIFFICULTY_META[continueCase.difficulty].bg}
+          variant="light"
+        />
+      )}
 
       <section
         className="flex flex-col gap-4 rounded-xl border border-black/8 p-4 pb-6 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),0px_1px_1px_rgba(0,0,0,0.1)]"

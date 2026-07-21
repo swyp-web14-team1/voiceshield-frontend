@@ -28,26 +28,23 @@ export default function LoginPage() {
     <div
       className="flex min-h-full flex-1 flex-col items-center"
       style={{
-        paddingTop: "clamp(150px, 23cqh, 230px)",
+        paddingTop: "clamp(150px, 23cqh, 240px)",
         paddingBottom: "clamp(16px, 4cqh, 32px)",
       }}
     >
       <div
         className="flex flex-col items-center text-center"
-        style={{ gap: "clamp(8px, 2cqh, 16px)" }}
+        style={{ gap: "clamp(14px, 1.5cqh, 44px)" }}
       >
         <Image
-          src="/logo.svg"
+          src="/logo_f.svg"
           alt="피싱안전교실"
-          width={96}
-          height={96}
+          width={120}
+          height={120}
           priority
-          style={{ width: "clamp(56px, 19.2cqw, 96px)", height: "clamp(56px, 19.2cqw, 96px)" }}
+          style={{ width: "clamp(80px, 27cqw, 155px)", height: "clamp(80px, 27cqw, 123px)" }}
         />
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">
-          피싱안전교실
-        </h1>
-        <p className="text-sm leading-[1.45] tracking-tight text-gray-600 dark:text-gray-400 ">
+        <p className="text-sm leading-[1.45] tracking-tight text-gray-600 dark:text-gray-400">
           실전 시뮬레이션으로 배우는
           <br />
           보이스피싱 예방 학습
