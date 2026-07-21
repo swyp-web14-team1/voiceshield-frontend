@@ -2,6 +2,51 @@
 
 기능을 구현하거나 수정할 때마다 아래 형식으로 최상단에 추가한다 (기존 내용은 지우지 않음).
 
+## [2026-07-21] `QuizResultCard` 추출 시 임의로 통일했던 배지+질문 줄 레이아웃을 각 페이지 원래 디자인대로 복원
+- 수정 파일: `src/components/learn/QuizResultCard.tsx`, `src/app/learn/[caseId]/message/progress/page.tsx`
+- 변경 내용: 직전 추출 때 call/progress(항상 가로 정렬)와 message/progress(좁으면 세로, 450px 이상에서 가로) 중 message 쪽으로 임의 통일했는데, 이는 순수 리팩터링 범위를 벗어난 디자인 변경이었음(사용자 확인 없이 call/progress의 기존 모습이 바뀜). `stackOnNarrow` prop을 추가해 기본값(false)은 call/progress의 원래 방식(항상 가로), message/progress에서만 `stackOnNarrow`를 명시적으로 켜서 원래의 반응형 스택 방식을 그대로 복원 — 두 페이지 모두 추출 이전과 동일한 디자인으로 되돌아감.
+
+## [2026-07-21] 전화·문자 시뮬레이션 완료 화면의 판단 퀴즈 결과 카드를 `QuizResultCard` 컴포넌트로 추출
+- 수정/생성 파일: `src/components/learn/QuizResultCard.tsx`(신규), `src/app/learn/[caseId]/call/progress/page.tsx`, `src/app/learn/[caseId]/message/progress/page.tsx`
+- 변경 내용: "선택N 배지 + 정답/오답 pill(아이콘 포함) + 정확합니다!/위험합니다 라벨 + 회색 해설 박스" 카드가 두 화면에서 거의 그대로 중복돼 있었음(call은 여러 퀴즈를 반복 렌더링, message는 퀴즈 1개). `index`, `question`, `isCorrect`, `chosenLabel`, `explanation` props만 받는 `QuizResultCard`로 추출. 배지+질문 줄 레이아웃이 call은 항상 가로 정렬(`flex items-start`), message는 좁은 컨테이너에서 세로로 쌓이는 반응형(`@[450px]:flex-row`)으로 서로 달랐는데, 추출하면서 message 쪽(더 안전한 반응형 버전)으로 통일함 — 500px 셸 폭에서는 어차피 항상 가로 정렬이라 실사용에는 차이 없음.
+- 비고: Playwright로 통화 시뮬레이션을 판단 퀴즈 2개까지 풀어 "시뮬레이션 완료" 화면에서 `QuizResultCard`가 정상 렌더링되는지 확인.
+
+## [2026-07-21] 전화·문자 시뮬레이션 완료 화면 공용 액션 버튼을 `SimulationCompleteActions` 컴포넌트로 추출
+- 수정/생성 파일: `src/components/learn/SimulationCompleteActions.tsx`(신규), `src/app/learn/[caseId]/call/progress/page.tsx`, `src/app/learn/[caseId]/message/progress/page.tsx`
+- 변경 내용: "다시 하기 / AI 분석 결과 보기 / 마무리 퀴즈 하러 가기" 3개 버튼이 두 화면에서 className까지 완전히 동일하게 중복돼 있었음(다만 문자 쪽은 아이콘이 빠져 있었음 — 통일하면서 아이콘도 맞춤). `caseId`, `onRestart`, `analysisInput`(`AnalyzeRequest`)만 props로 받는 공용 컴포넌트로 추출해 두 페이지 모두 이걸 사용하도록 교체. 각 페이지에 남아있던 `saveAnalysisInput`/`RiShiningLine`/(문자 쪽은 `MdOutlineReplay`) 관련 import도 더는 필요 없어져 정리.
+- 비고: Playwright로 통화 시뮬레이션을 실제로 판단 퀴즈 2개까지 풀어 "시뮬레이션 완료" 화면까지 진행시켜 컴포넌트가 정상 렌더링되는지 확인.
+
+## [2026-07-21] 마지막 대사 스크롤 여백(spacer) 로직 제거 — 그냥 자연스럽게 최대한 위로만 스크롤
+- 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용: 직전 두 차례 수정(고정 `60cqh` 여백 → 동적 계산+96px 상한 여백)까지도 여전히 부자연스럽다는 피드백을 받아, 여백을 만들어 억지로 "정확히 맨 위"까지 끌어올리는 접근 자체를 포기함. `scrollLastLineToTop`/`scrollSpacerRef`/여백용 `<div>`를 전부 제거하고, 다시 `scrollLineToTop(lastDialogueIndex)`만 호출 — 대화가 짧아 스크롤 여유가 부족하면 자연스러운 최대 위치까지만 올라가고, 억지 여백으로 인한 빈 공간은 생기지 않음.
+- 비고: "재생 시작 시점에 스크롤"과 "대상을 마지막 caller가 아닌 진짜 마지막 대사로" 두 가지 수정은 그대로 유지됨 — 이번엔 여백 관련 부분만 되돌림.
+
+## [2026-07-21] 마지막 대사 스크롤용 여백을 고정값 대신 동적 계산 + 상한으로 교체
+- 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용: 직전 수정에서 마지막 대사를 스크롤 맨 위로 올리기 위해 리스트 끝에 `height: 60cqh` 고정 여백을 추가했는데, 짧은 대화(대사 카드 자체가 컨테이너보다 훨씬 작은 경우)에서는 그 여백이 그대로 화면 하단에 큰 빈 공간으로 남아 어색했음. 고정값 대신 스크롤 직전(`scrollLastLineToTop`)에 `컨테이너 높이 - 대사 카드 높이`로 필요한 만큼만 계산해서 여백 엘리먼트(`scrollSpacerRef`)에 채우도록 변경하고, 그마저도 최대 96px로 상한을 둠(대사 카드가 아주 짧으면 정확히 "맨 위"까지는 안 올라가고 최대한 가깝게만 올라감 — 정확한 top 정렬보다 과도한 빈 공간을 피하는 쪽을 택함).
+- 비고: Playwright로 institution-01 케이스(대사 3줄, 마지막 대사 카드 높이 57px)에서 여백 적용 전/후 스크린샷을 비교 — 적용 전엔 마지막 대사와 퀴즈 카드 사이에 큰 빈 공간이 남았고, 적용 후엔 대사가 상단 가까이(40px 여백) 위치하고 퀴즈 카드까지의 간격도 자연스러워짐을 확인.
+
+## [2026-07-21] `currentAudio.play()`에 타임아웃 보호 추가
+- 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용: `playLine`에서 `await currentAudio.play()`에는 타임아웃이 없어서, 이 프로미스가 resolve도 reject도 안 하고 멈추는 경우(재사용 중인 엘리먼트의 재생 요청이 브라우저에 따라 안정적으로 처리되지 않는 경우 등) 대화 전체가 영영 멈추는 구조였음. `currentAudio.load()`를 호출해 새 소스를 확실히 반영시키고, `play()` 자체도 `withTimeout(..., 4000)`으로 감싸 멈춰도 반드시 다음 단계로 넘어가게 함.
+- 비고: 실제로 재현한 "대화가 안 넘어감" 증상은 이 이슈가 아니라 스크롤 확인용 테스트 스크립트가 존재하지 않는 문구("정답 제출")를 기다리고 있었던 테스트 실수였음(대화 자체는 정상 진행되고 있었음) — 다만 `play()`에 타임아웃이 없던 건 실기기에서 재현될 수 있는 별개의 실질적인 위험이라 방어적으로 남겨둠.
+
+## [2026-07-21] 통화 시뮬레이션 대사 자동 스크롤 로직을 재생 시작 시점 기준으로 재구성
+- 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용: 기존엔 "재생이 끝난 대사"를 스크롤 맨 위로 올리고(playLine의 finally), 퀴즈 전환 시에는 "마지막 caller 대사"(`lastCallerIndex`)를 올리고 있었는데, 실제로 원하던 동작은 "지금 TTS로 읽고 있는 대사가 상단에 오고, 대화가 다 끝나면 진짜 마지막 대사(caller/user 상관없이)가 상단에 오는 것"이었음. `scrollLineToTop(index)` 호출을 `playLine` 시작 시점(`setPlayingLineIndex` 직후)으로 옮기고, 퀴즈 전환 시 스크롤 대상도 `lastCallerIndex` 대신 `phishingCase.phoneDialogue.length - 1`(실제 마지막 항목)로 변경.
+  - 추가로, 마지막 대사는 그 아래에 남은 콘텐츠가 없어서 스크롤 가능한 최대 위치가 부족해 "맨 위"까지 끌어올리는 게 물리적으로 불가능한 경우가 있었음(스크롤 컨테이너가 짧은 대화에서는 스크롤 여유 자체가 없음) — 대화가 전부 공개된 뒤(`revealedCount`가 전체 길이에 도달했을 때)에만 `height: 60cqh`짜리 여백을 리스트 맨 끝에 추가해 항상 충분한 스크롤 여유를 확보.
+- 비고: Playwright로 음소거 후 대화를 빠르게 진행시켜 퀴즈 전환 시점의 실제 마지막 대사 `getBoundingClientRect().top`이 컨테이너 상단과 거의 일치하는지 확인(여백 추가 전엔 스크롤이 최대치에 막혀 마지막 대사가 상단에 도달하지 못함을 직접 재현·확인 후 수정).
+
+## [2026-07-21] 통화 시뮬레이션 대사 재생 타이밍 조정 — 첫 대사 0.6초 지연, 다음 대사 미리 prefetch
+- 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용: `runDialogue` 루프에서 첫 번째(`i===0`) caller 대사는 화면 진입 즉시 재생되던 것을 0.6초 지연 후 재생하도록 변경(너무 갑작스럽게 시작되는 느낌 완화, 처음엔 0.2초로 했다가 0.6초로 조정). 또한 caller 대사를 재생하기 시작할 때 그다음 caller 대사의 TTS를 `prefetchTts`로 미리 요청해둬서, 현재 대사가 끝나자마자 다음 대사가 fetch 대기 없이 바로 이어지도록 함(`lib/tts.ts`의 캐시 덕분에 이미 fetch된 요청은 재사용됨).
+- 비고: 수신 전화 화면(`call/page.tsx`)에서 이미 첫 대사만 미리 prefetch해두던 것과 같은 방식을 두 번째 이후 대사에도 연쇄적으로 적용한 것.
+
+## [2026-07-21] 모바일에서 퀴즈 전환 시 마지막 대사가 위로 스크롤되지 않던 문제 수정
+- 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용: `phase`가 `"quiz"`로 바뀔 때 마지막 caller 대사를 스크롤 영역 맨 위로 올리는 효과가 `requestAnimationFrame` 한 번만 기다렸는데, 같은 렌더에서 `QuizCard`가 함께 마운트되며 대화 스크롤 영역(`flex-1`)의 높이가 줄어드는 레이아웃 변화가 모바일에서는 그 한 프레임 안에 다 반영되지 않는 경우가 있어 스크롤 위치 계산이 어긋났음(그래서 마지막 대사가 위로 안 올라간 것처럼 보임). `requestAnimationFrame`을 중첩해서 한 프레임 더 기다린 뒤(double rAF) 스크롤 위치를 계산하도록 수정.
+- 비고: 실기기 검증은 못 함 — 레이아웃 반영 타이밍 문제라는 진단에 근거한 수정.
+
 ## [2026-07-21] 통화 시뮬레이션 완료 화면의 "마무리 퀴즈 하러 가기" 버튼을 문자 시뮬레이션과 동일한 단색 테두리로 변경
 - 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
 - 변경 내용: 같은 버튼이 문자 시뮬레이션 완료 화면(`message/progress/page.tsx`)에서는 `border border-[#1a2035]` 단색 테두리로 되어있는데, 통화 시뮬레이션 쪽만 바깥 `div`에 그라데이션 배경 + `p-[1.5px]`로 그라데이션 테두리처럼 보이게 하는 방식이라 서로 달랐음. 감싸던 `div`를 없애고 문자 쪽과 동일하게 버튼에 `border border-[#1a2035]`를 직접 적용.

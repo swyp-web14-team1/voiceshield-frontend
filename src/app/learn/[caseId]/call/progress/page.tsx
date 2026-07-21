@@ -3,25 +3,24 @@
 import { use, useEffect, useRef, useState } from "react";
 import { useRouter, notFound } from "next/navigation";
 import { FiX } from "react-icons/fi";
-import { MdOutlineReplay, MdCancel } from "react-icons/md";
+import { MdOutlineReplay } from "react-icons/md";
 import { BsFillPersonFill } from "react-icons/bs";
 import { IoVolumeMute, IoVolumeHigh } from "react-icons/io5";
-import { RiCheckboxCircleFill, RiShiningLine } from "react-icons/ri";
 import { getCaseById, CASE_CATEGORY_LABEL } from "@/lib/mock-cases";
 import { ROUTES } from "@/lib/routes";
 import { getStoredTtsPreference, prefetchTts } from "@/lib/tts";
 import { WAVEFORM_BAR_PATHS } from "@/lib/waveform-bars";
-import { saveAnalysisInput } from "@/lib/analysis";
 import { recordCaseProgress } from "@/lib/progress";
 import { useStudyTimeTracker } from "@/lib/daily-stats";
 import { QuizCard } from "@/components/learn/QuizCard";
 import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
+import { SimulationCompleteActions } from "@/components/learn/SimulationCompleteActions";
+import { QuizResultCard } from "@/components/learn/QuizResultCard";
 
 type Phase = "dialogue" | "quiz" | "complete";
 
 const HEADER_GRADIENT = "linear-gradient(165deg, #1a2035 0%, #2d1f4e 100%)";
-// 오디오 재생 대사 1개당 최대 대기 시간. 모바일 브라우저(특히 iOS Safari)에서 speechSynthesis의
-// onend/onerror가 아예 발화하지 않는 경우가 실제로 있어, 이 시간이 지나면 강제로 다음으로 넘어간다.
+
 const PLAYBACK_TIMEOUT_MS = 15_000;
 
 function withTimeout(promise: Promise<void>, ms: number): Promise<void> {
@@ -94,7 +93,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
     }
   }, [muted]);
 
-  // 컴포넌트가 완전히 언마운트될 때(다른 페이지로 이동 등)도 재생 중이던 오디오를 확실히 멈춘다.
+
   useEffect(() => {
     return () => {
       audioRef.current?.pause();
@@ -104,10 +103,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
 
   const currentQuestion = phishingCase.quiz[quizIndex];
   const correctCount = answers.filter((answer, i) => answer === phishingCase.quiz[i].answerIndex).length;
-  const lastCallerIndex = phishingCase.phoneDialogue.reduce(
-    (acc, line, i) => (line.speaker === "caller" ? i : acc),
-    -1,
-  );
+  const lastDialogueIndex = phishingCase.phoneDialogue.length - 1;
 
   const scrollLineToTop = (index: number) => {
     const container = dialogueScrollRef.current;
@@ -117,12 +113,17 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
     container.scrollTo({ top: offset, behavior: "smooth" });
   };
 
-
   useEffect(() => {
-    if (phase !== "quiz" || lastCallerIndex < 0) return;
-    const raf = requestAnimationFrame(() => scrollLineToTop(lastCallerIndex));
-    return () => cancelAnimationFrame(raf);
-  }, [phase, lastCallerIndex]);
+    if (phase !== "quiz" || lastDialogueIndex < 0) return;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => scrollLineToTop(lastDialogueIndex));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [phase, lastDialogueIndex]);
 
   const playLine = async (index: number, text: string) => {
     const token = ++playTokenRef.current;
@@ -130,6 +131,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
     audioRef.current?.pause();
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setPlayingLineIndex(index);
+    scrollLineToTop(index);
 
     let url: string | null = null;
 
@@ -139,21 +141,18 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       const blob = await prefetchTts(text, voice, rate);
       url = URL.createObjectURL(blob);
       if (token !== playTokenRef.current) throw new Error("superseded");
-
-      // 매 대사마다 `new Audio()`로 새 엘리먼트를 만들면 모바일 사파리 등에서 첫 대사 이후로는
-      // 사용자 제스처와 무관한 새 엘리먼트로 취급돼 재생이 막히는 경우가 있다 — 엘리먼트 하나를
-      // 계속 재사용하며 src만 바꿔서(이미 한 번 재생에 성공한 엘리먼트는 이후에도 계속 허용되는
-      // 경향이 있음) 이 문제를 피한다.
       if (!audioRef.current) audioRef.current = new Audio();
       const currentAudio = audioRef.current;
       currentAudio.src = url;
+      currentAudio.load();
       const ended = new Promise<void>((resolve) => {
         currentAudio.onended = () => resolve();
         currentAudio.onerror = () => resolve();
 
         currentAudio.onpause = () => resolve();
       });
-      await currentAudio.play();
+
+      await withTimeout(currentAudio.play(), 4000);
       if (token !== playTokenRef.current) throw new Error("superseded");
       await withTimeout(ended, PLAYBACK_TIMEOUT_MS);
     } catch {
@@ -182,8 +181,6 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       if (url) URL.revokeObjectURL(url);
       if (token === playTokenRef.current) {
         setPlayingLineIndex(null);
-
-        scrollLineToTop(index);
       }
     }
   };
@@ -198,6 +195,17 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
         setRevealedCount(i + 1);
         const line = phishingCase.phoneDialogue[i];
         if (line.speaker === "caller") {
+          if (i === 0) {
+
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            if (cancelled || exitedRef.current) return;
+          }
+
+          const nextCaller = phishingCase.phoneDialogue.slice(i + 1).find((l) => l.speaker === "caller");
+          if (nextCaller) {
+            const { voice, rate } = getStoredTtsPreference();
+            prefetchTts(nextCaller.text, voice, rate).catch(() => {});
+          }
           await playLine(i, line.text);
         } else {
           await new Promise((resolve) => setTimeout(resolve, 900));
@@ -432,76 +440,29 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
                 const chosen = answers[i];
                 const isCorrect = chosen === q.answerIndex;
                 return (
-                  <div
+                  <QuizResultCard
                     key={q.id}
-                    className="rounded-xl bg-white px-6.25 pb-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
-                    style={{ paddingTop: "clamp(20px, 6cqw, 34px)" }}
-                  >
-                    <div className="flex flex-col items-center gap-3.5 text-center">
-                      <div className="flex w-full items-start gap-2">
-                        <span className="flex h-[clamp(20px,5.5cqw,22px)] shrink-0 items-center justify-center rounded-full border-[1.5px] border-[#1a2332] px-[clamp(6px,2cqw,8px)] text-[clamp(10px,2.8cqw,12px)] font-bold text-[#1a2332]">
-                          선택{i + 1}
-                        </span>
-                        <p className="break-keep text-left text-sm font-semibold text-[#1a2332]">{q.question}</p>
-                      </div>
-                      <div
-                        className={`flex items-center gap-1.5 rounded-lg px-[clamp(12px,4cqw,24px)] py-2 text-left text-xs font-semibold text-white ${
-                          isCorrect ? "bg-[#00bc7d]" : "bg-[#df1e21]"
-                        }`}
-                      >
-                        {isCorrect ? (
-                          <RiCheckboxCircleFill size={18} className="shrink-0" />
-                        ) : (
-                          <MdCancel size={18} className="shrink-0" />
-                        )}
-                        <span className="break-keep leading-tight">{chosen !== null ? q.choices[chosen] : "선택하지 않음"}</span>
-                      </div>
-                      <p className={`text-sm font-bold ${isCorrect ? "text-[#00bc7d]" : "text-[#df1e21]"}`}>
-                        {isCorrect ? "정확합니다!" : "위험합니다"}
-                      </p>
-                      <div className="rounded-xl bg-gray-100 px-3.5 py-2.5">
-                        <p className="text-left text-xs leading-relaxed text-gray-700">{q.explanation}</p>
-                      </div>
-                    </div>
-                  </div>
+                    index={i + 1}
+                    question={q.question}
+                    isCorrect={isCorrect}
+                    chosenLabel={chosen !== null ? q.choices[chosen] : "선택하지 않음"}
+                    explanation={q.explanation}
+                  />
                 );
               })}
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-2.5 border-t border-gray-200 bg-white px-4 py-3.5">
-            <button
-              type="button"
-              onClick={handleRestart}
-              className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-gray-300 text-sm font-semibold text-gray-500 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50 [@media(hover:hover)_and_(pointer:fine)]:hover:text-[#1a2035]"
-            >
-              <MdOutlineReplay size={16} />
-              다시 하기
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                saveAnalysisInput(caseId, {
-                  caseTitle: phishingCase.title,
-                  category: CASE_CATEGORY_LABEL[phishingCase.category],
-                  quiz: phishingCase.quiz,
-                  answers,
-                });
-                router.push(ROUTES.callAnalysis(caseId));
-              }}
-              className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#1a2035] text-sm font-semibold text-white [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#212841]"
-            >
-              <RiShiningLine size={15} />
-              AI 분석 결과 보기
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push(ROUTES.callQuiz(caseId))}
-              className="flex h-10.25 w-full cursor-pointer items-center justify-center rounded-[7px] border border-[#1a2035] bg-white text-sm font-semibold text-[#1a2035] [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50"
-            >
-              마무리 퀴즈 하러 가기
-            </button>
-          </div>
+          <SimulationCompleteActions
+            caseId={caseId}
+            onRestart={handleRestart}
+            analysisInput={{
+              caseTitle: phishingCase.title,
+              category: CASE_CATEGORY_LABEL[phishingCase.category],
+              quiz: phishingCase.quiz,
+              answers,
+            }}
+          />
         </>
       )}
 

@@ -11,15 +11,15 @@ const EMERGENCY_CONTACTS = [
     org: "경찰청",
     number: "112",
     tags: ["#즉시 신고", "#긴급 대응"],
-    gradient: "linear-gradient(to top right, #ffcbcc -30%, #df1e21 100%)",
-    border: "#f42c2f",
+    gradient: "linear-gradient(to top right, #ffcbcc -40%, #df1e21 100%)",
+    border: "none",
   },
   {
     org: "금융감독원",
     number: "1332",
     tags: ["#금융 사기 상담", "#계좌 정지"],
     gradient: "linear-gradient(to top right, #60a5fa 0%, #2849be 100%)",
-    border: "#395cd8",
+    border: "none",
   },
 ];
 
@@ -102,7 +102,7 @@ export default function EmergencyPage() {
               className="flex flex-col justify-between rounded-lg border-2 text-left shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
               style={{
                 backgroundImage: c.gradient,
-                borderColor: c.border,
+                ...(c.border === "none" ? { borderStyle: "none" } : { borderColor: c.border }),
                 height: "clamp(110px, 30cqw, 136px)",
                 padding: "clamp(12px, 3.6cqw, 16px)",
               }}

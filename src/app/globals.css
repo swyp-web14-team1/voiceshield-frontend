@@ -28,7 +28,7 @@
 
   --text-xs: calc(var(--font-scale, 1) * clamp(12px, 2.4cqw, 12px));
   --text-sm: calc(var(--font-scale, 1) * clamp(13px, 2.8cqw, 14px));
-  --text-base: calc(var(--font-scale, 1) * clamp(13px, 3.2cqw, 16px));
+  --text-base: calc(var(--font-scale, 1) * clamp(14px, 3.2cqw, 16px));
   --text-xl: calc(var(--font-scale, 1) * clamp(17px, 5cqw, 20px));
   --text-3xl: calc(var(--font-scale, 1) * clamp(13px, 6cqw, 30px));
 }

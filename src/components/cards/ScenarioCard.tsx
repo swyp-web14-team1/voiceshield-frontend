@@ -32,7 +32,7 @@ export function ScenarioCard({ phishingCase }: { phishingCase: PhishingCase }) {
           <span className="text-sm font-bold text-gray-900">{CASE_CATEGORY_LABEL[phishingCase.category]}</span>
         </div>
         {isLoggedIn && phishingCase.isCompleted && (
-          <span className="flex items-center gap-0.5 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-orange-500 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
+          <span className="flex items-center gap-0.5 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-orange-500 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
             학습 완료
             <FaCircleCheck size={12} className="text-orange-500" />
           </span>

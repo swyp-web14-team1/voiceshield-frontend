@@ -49,15 +49,12 @@ const RECOMMENDED_CASES = [...MOCK_CASES].sort((a, b) => b.recommendation - a.re
 
 
 export default function HomePage() {
-  // localStorage 기반 진행 기록은 서버에서 읽을 수 없으므로, 초기값은 서버·클라이언트 동일하게 빈 스냅샷으로 고정하고
-  // 실제 값은 마운트 후 useEffect에서 읽는다 (하이드레이션 불일치 방지).
   const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
   const [todayStudyMinutes, setTodayStudyMinutes] = useState(0);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const isLoggedIn = useIsLoggedIn();
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
     setProgress(readProgressSnapshot());
     setTodayStudyMinutes(getTodayStudyMinutes());
     setTodayCompletedCount(getTodayCompletedCount());
@@ -81,7 +78,7 @@ export default function HomePage() {
         </h1>
         {isLoggedIn && (
           <>
-            <p className="mt-2.25 text-sm text-slate-500">전체 학습 진도율</p>
+            <p className="mt-2.5 text-sm text-slate-500">전체 학습 진도율</p>
             <div className="mt-0.5 h-2 w-full overflow-hidden rounded-full bg-[#e6eaf0]">
               <div
                 className="h-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-400"
