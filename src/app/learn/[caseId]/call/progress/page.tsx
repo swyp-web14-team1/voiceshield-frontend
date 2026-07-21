@@ -8,7 +8,7 @@ import { BsFillPersonFill } from "react-icons/bs";
 import { IoVolumeMute, IoVolumeHigh } from "react-icons/io5";
 import { getCaseById, CASE_CATEGORY_LABEL } from "@/lib/mock-cases";
 import { ROUTES } from "@/lib/routes";
-import { getStoredTtsPreference, prefetchTts } from "@/lib/tts";
+import { getStoredTtsPreference, prefetchTts, unlockMobileAudio } from "@/lib/tts";
 import { WAVEFORM_BAR_PATHS } from "@/lib/waveform-bars";
 import { recordCaseProgress } from "@/lib/progress";
 import { useStudyTimeTracker } from "@/lib/daily-stats";
@@ -22,6 +22,9 @@ type Phase = "dialogue" | "quiz" | "complete";
 const HEADER_GRADIENT = "linear-gradient(165deg, #1a2035 0%, #2d1f4e 100%)";
 
 const PLAYBACK_TIMEOUT_MS = 15_000;
+// 음소거 상태에서 대사 하나당 유지할 최소 노출 시간 — 소리가 없다고 대사가 순간이동하듯 한꺼번에
+// 넘어가버리면 안 되므로, 실제 재생 시간 대신 이 정도의 텀을 유지한다.
+const MUTED_LINE_DELAY_MS = 1_600;
 
 function withTimeout(promise: Promise<void>, ms: number): Promise<void> {
   return Promise.race([promise, new Promise<void>((resolve) => setTimeout(resolve, ms))]);
@@ -85,6 +88,18 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
     recordCaseProgress(caseId, phase);
   }, [caseId, phase]);
 
+  // 수신 전화 화면의 "시작하기" 버튼을 거치지 않고 이 화면에 직접 진입하거나(새로고침 등) 그 제스처의
+  // 잠금 해제가 유지되지 않는 브라우저를 위한 보완책 — 이 화면에서 처음 탭/클릭하는 순간에도 한 번 더
+  // 오디오/TTS 잠금 해제를 시도한다.
+  useEffect(() => {
+    const unlock = () => {
+      unlockMobileAudio();
+      window.removeEventListener("pointerdown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, []);
+
   useEffect(() => {
     mutedRef.current = muted;
     if (muted) {
@@ -127,7 +142,17 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
 
   const playLine = async (index: number, text: string) => {
     const token = ++playTokenRef.current;
-    if (mutedRef.current || exitedRef.current) return;
+    if (exitedRef.current) return;
+
+    if (mutedRef.current) {
+      // 음소거 상태여도 대사가 순간이동하듯 한꺼번에 넘어가면 안 되므로, 소리 없이도 최소한의 텀은 유지한다.
+      setPlayingLineIndex(index);
+      scrollLineToTop(index);
+      await new Promise((resolve) => setTimeout(resolve, MUTED_LINE_DELAY_MS));
+      if (token === playTokenRef.current) setPlayingLineIndex(null);
+      return;
+    }
+
     audioRef.current?.pause();
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setPlayingLineIndex(index);
@@ -148,8 +173,10 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       const ended = new Promise<void>((resolve) => {
         currentAudio.onended = () => resolve();
         currentAudio.onerror = () => resolve();
-
-        currentAudio.onpause = () => resolve();
+        // 재생 중 음소거를 누르면 이 pause가 즉시 발생하는데, 그대로 바로 resolve하면 지금 보이던
+        // 대사가 순간이동하듯 건너뛰어 버린다 — 음소거 상태로 새로 시작하는 대사와 같은 정도의
+        // 텀(MUTED_LINE_DELAY_MS)을 준 뒤에 다음으로 넘어가게 한다.
+        currentAudio.onpause = () => setTimeout(resolve, MUTED_LINE_DELAY_MS);
       });
 
       await withTimeout(currentAudio.play(), 4000);

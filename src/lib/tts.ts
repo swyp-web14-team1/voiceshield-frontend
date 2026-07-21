@@ -19,6 +19,26 @@ export function getStoredTtsPreference(): { voice: (typeof TTS_VOICES)[number]; 
   return { voice, rate };
 }
 
+// 무음 44바이트 WAV. 모바일 브라우저는 오디오/TTS 재생을 "사용자 제스처와 동일한 이벤트" 안에서 시작해야만
+// 허용한다 — 이 무음을 사용자 제스처(클릭/탭) 핸들러 안에서 한 번 재생해두면, 이후 같은 세션에서 만들어지는
+// Audio/speechSynthesis 재생이 대부분의 브라우저에서 잠금 해제된다.
+const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
+export function unlockMobileAudio() {
+  try {
+    new Audio(SILENT_WAV).play().catch(() => {});
+  } catch {
+    // ignore
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+    } catch {
+      // ignore
+    }
+  }
+}
+
 const ttsBlobCache = new Map<string, Promise<Blob>>();
 
 function ttsCacheKey(text: string, voice: string, rate: number) {

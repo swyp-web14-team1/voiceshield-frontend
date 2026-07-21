@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter, notFound } from "next/navigation";
-import { FiX, FiBookOpen } from "react-icons/fi";
+import { FiX } from "react-icons/fi";
 import { RiCheckboxCircleFill } from "react-icons/ri";
 import { MdOutlineReplay, MdCancel } from "react-icons/md";
 import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
@@ -174,13 +174,7 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
               </div>
 
               <div className="mt-1 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-[#1a2332]">다음 학습이 궁금하다면?</p>
-                  <span className="flex items-center gap-1 text-sm font-bold text-[#1a2035] uppercase">
-                    <FiBookOpen size={14} className="text-gray-600" />
-                    오늘의 추천학습
-                  </span>
-                </div>
+                <p className="text-sm font-semibold text-[#1a2332]">다음 학습이 궁금하다면?</p>
                 <RecommendedCard href={ROUTES.scenario(recommended.id)} phishingCase={recommended} />
               </div>
 

@@ -2,6 +2,18 @@
 
 기능을 구현하거나 수정할 때마다 아래 형식으로 최상단에 추가한다 (기존 내용은 지우지 않음).
 
+## [2026-07-21] 재생 중에 음소거를 눌러도 현재 대사가 순간이동하듯 건너뛰던 문제 추가 수정
+- 수정 파일: `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용: 직전 수정(음소거 상태로 "시작하는" 대사에 페이싱 추가)만으로는 부족했음 — 대사가 **재생되는 도중에** 음소거를 누르면 `audio.pause()`가 호출되고, 그 순간 `onpause` 핸들러가 `ended` 프로미스를 즉시 resolve해버려서 지금 보이던 대사가 그대로 순간 건너뛰어졌음. `onpause`에서 즉시 resolve하는 대신 `MUTED_LINE_DELAY_MS`(1.6초)만큼 지연 후 resolve하도록 변경 — 재생 중 음소거를 누르는 경우와 음소거 상태로 새 대사가 시작되는 경우 모두 동일한 텀을 유지하게 됨.
+- 비고: 이전 수정과 이번 수정은 서로 다른 경로(새로 시작하는 대사 vs 재생 중 중단되는 대사)에서 발생하는 문제라 둘 다 필요했음.
+
+## [2026-07-21] 통화 시뮬레이션 음소거 시 대사가 한꺼번에 넘어가던 문제 수정 + 오디오 잠금 해제 보완
+- 수정 파일: `src/lib/tts.ts`, `src/app/learn/[caseId]/call/page.tsx`, `src/app/learn/[caseId]/call/progress/page.tsx`
+- 변경 내용:
+  - `playLine`이 음소거 상태면 `if (mutedRef.current || exitedRef.current) return;`로 그냥 즉시 반환해버려서, `runDialogue` 루프가 caller 대사마다 아무 지연 없이 바로바로 넘어가 대사·퀴즈까지 한꺼번에 나와버리는 문제가 있었음(소리만 꺼야 하는데 페이싱까지 없어짐). 음소거 상태에서도 `MUTED_LINE_DELAY_MS`(1.6초)만큼은 노출을 유지한 뒤 다음으로 넘어가도록 수정.
+  - `call/page.tsx`에만 있던 `unlockMobileAudio`(무음 WAV 재생 + 빈 발화로 모바일 오디오/TTS 잠금 해제)를 `lib/tts.ts`로 옮겨 공용화. `call/progress/page.tsx`에도 마운트 후 첫 탭/클릭(`pointerdown`, 1회성) 시점에 동일하게 잠금 해제를 시도하도록 추가 — 수신 전화 화면의 "시작하기" 버튼을 거치지 않고 `call/progress`에 새로고침 등으로 직접 진입한 경우, 그 화면에서 처음 상호작용하는 순간에도 잠금 해제 기회를 한 번 더 준다.
+- 비고: Playwright로 음소거 후 대사 노출 간격을 시간 측정해 확인(약 0.5~2s 간격으로 순차 노출, 이전처럼 한꺼번에 나오지 않음). "새로고침 후 소리 안 남" 자체는 브라우저 자동재생 정책(사용자 제스처 필요)에 의한 것으로 추정 — 실기기에서 이 보완으로 개선되는지 확인 필요.
+
 ## [2026-07-21] `QuizResultCard` 추출 시 임의로 통일했던 배지+질문 줄 레이아웃을 각 페이지 원래 디자인대로 복원
 - 수정 파일: `src/components/learn/QuizResultCard.tsx`, `src/app/learn/[caseId]/message/progress/page.tsx`
 - 변경 내용: 직전 추출 때 call/progress(항상 가로 정렬)와 message/progress(좁으면 세로, 450px 이상에서 가로) 중 message 쪽으로 임의 통일했는데, 이는 순수 리팩터링 범위를 벗어난 디자인 변경이었음(사용자 확인 없이 call/progress의 기존 모습이 바뀜). `stackOnNarrow` prop을 추가해 기본값(false)은 call/progress의 원래 방식(항상 가로), message/progress에서만 `stackOnNarrow`를 명시적으로 켜서 원래의 반응형 스택 방식을 그대로 복원 — 두 페이지 모두 추출 이전과 동일한 디자인으로 되돌아감.
