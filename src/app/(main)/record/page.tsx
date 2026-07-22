@@ -269,8 +269,9 @@ export default function RecordPage() {
           <div className="absolute inset-0 flex items-center justify-center bg-white/10 px-4 backdrop-blur-md">
             <GuestSaveProgressCard
               onLoggedIn={() => setIsLoggedIn(true)}
-              style={{ backgroundColor: "#1a2035", paddingBlock: "55px" }}
+              style={{ backgroundColor: "#1a2035" }}
               className="w-full max-w-116.5"
+              message="학습기록을 확인해보세요!"
             />
           </div>
         )}

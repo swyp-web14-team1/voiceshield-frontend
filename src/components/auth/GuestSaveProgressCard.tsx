@@ -10,21 +10,23 @@ export function GuestSaveProgressCard({
   onLoggedIn,
   style,
   className = "",
+  message = "이번 학습을 저장해보세요!",
 }: {
   onLoggedIn: () => void;
   style?: React.CSSProperties;
   className?: string;
+  message?: string;
 }) {
   return (
     <div
-      className={`flex items-center justify-center gap-4 rounded-xl px-4 py-5.5 shadow-[0px_1px_3px_rgba(0,0,0,0.1)] ${className}`}
-      style={style}
+      className={`@container flex items-center justify-center rounded-xl shadow-[0px_1px_3px_rgba(0,0,0,0.1)] ${className}`}
+      style={{ gap: "clamp(14px, 5cqw, 16px)", paddingInline: "clamp(10px, 4cqw, 16px)", paddingBlock: "clamp(24px, 14cqw, 55px)", ...style }}
     >
-      <div className="flex flex-col gap-2">
-        <p className="text-base font-semibold text-white">
+      <div className="flex min-w-0 flex-col gap-2">
+        <p className="break-keep font-semibold text-white" style={{ fontSize: "clamp(12px, 4.2cqw, 16px)" }}>
           간편 로그인 하고
           <br />
-          이번 학습을 저장해보세요!
+          {message}
         </p>
         <button
           type="button"
@@ -32,9 +34,10 @@ export function GuestSaveProgressCard({
             localStorage.setItem(AUTH_STORAGE_KEY, "true");
             onLoggedIn();
           }}
-          className="flex w-fit shrink-0 cursor-pointer items-center gap-4 bg-[#FEE500] text-xs leading-none font-semibold whitespace-nowrap text-[#3c1e1e] hover:bg-[#f7de04]"
+          className="flex w-fit shrink-0 cursor-pointer items-center bg-[#FEE500] text-xs leading-none font-semibold whitespace-nowrap text-[#3c1e1e] hover:bg-[#f7de04]"
           style={{
-            paddingInline: "clamp(10px, 4cqw, 13px)",
+            gap: "clamp(3px, 2.5cqw, 16px)",
+            paddingInline: "clamp(6px, 2.5cqw, 13px)",
             paddingBlock: "clamp(5px, 2cqw, 7px)",
             borderRadius: "clamp(4px, 1.558cqw, 7.79px)",
           }}

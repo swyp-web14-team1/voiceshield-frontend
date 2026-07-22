@@ -93,7 +93,7 @@ export default function EmergencyPage() {
         <p className="pt-2 text-xl font-bold text-[#1a2332]">바로 전화 하기</p>
         <p className="pt-1 pb-3 text-sm text-gray-600">보이스피싱 피해 시 즉시 신고하세요</p>
 
-        <div className="grid grid-cols-2 gap-3.75">
+        <div className="grid grid-cols-2" style={{ gap: "clamp(8px, 3.6cqw, 15px)" }}>
           {EMERGENCY_CONTACTS.map((c) => (
             <button
               key={c.org}

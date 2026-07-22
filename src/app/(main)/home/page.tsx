@@ -10,6 +10,7 @@ import {
   CategoryDeliveryIcon,
   CategoryFamilyIcon,
   CategoryMessengerIcon,
+  ChevronIcon,
 } from "@/components/icons/home-icons";
 import { DIFFICULTY_META, INSTITUTION_ICON_SIZE } from "@/lib/case-meta";
 import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/progress";
 import { getTodayStudyMinutes } from "@/lib/daily-stats";
 import type { CaseCategory } from "@/types";
+import { IoIosArrowForward } from "react-icons/io";
 
 const DEFAULT_CONTINUE_CASE_ID = "institution-01";
 const EMPTY_PROGRESS_SNAPSHOT: ProgressSnapshot = { recentInProgressCaseId: null, overrides: {} };
@@ -55,6 +57,7 @@ export default function HomePage() {
   const isLoggedIn = useIsLoggedIn();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
     setProgress(readProgressSnapshot());
     setTodayStudyMinutes(getTodayStudyMinutes());
     setTodayCompletedCount(getTodayCompletedCount());
@@ -71,11 +74,22 @@ export default function HomePage() {
 
   return (
     <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3.5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">
-      <section className="flex flex-col gap-1 rounded-xl bg-white p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
+      <section className="flex flex-col gap-1 rounded-xl bg-white pb-4 p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
         <p className="text-xs font-medium text-[#64748B]">피싱안전지킴이</p>
-        <h1 className="text-xl font-bold text-[#1a2332]">
-          안녕하세요, <span className="text-blue-600">{isLoggedIn ? "홍길동" : "게스트"}</span> 님!
-        </h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-xl font-bold text-[#1a2332]">
+            안녕하세요, <span className="text-blue-600">{isLoggedIn ? "홍길동" : "게스트"}</span> 님!
+          </h1>
+          {!isLoggedIn && (
+            <Link
+              href={ROUTES.login}
+              className="flex shrink-0 cursor-pointer items-center gap-0.5 rounded-md border border-gray-200 py-1 pr-2 pl-3 text-xs font-semibold text-gray-700 [@media(hover:hover)_and_(pointer:fine)]:hover:bg-gray-50 justify-center text-center"
+            >
+              로그인
+              <IoIosArrowForward className="-mr-1 size-3.5 text-gray-500" />
+            </Link>
+          )}
+        </div>
         {isLoggedIn && (
           <>
             <p className="mt-2.5 text-sm text-slate-500">전체 학습 진도율</p>
