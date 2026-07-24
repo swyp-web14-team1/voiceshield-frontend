@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BsFillPersonFill } from "react-icons/bs";
 import { ROUTES } from "@/lib/routes";
-import { getCaseById } from "@/lib/mock-cases";
+import { fetchCaseDetail } from "@/lib/api/case-data";
 import { getStoredTtsPreference, prefetchTts, unlockMobileAudio } from "@/lib/tts";
 
 const ACTION_BUTTON_SIZE = "clamp(56px, 18cqw, 75px)";
@@ -18,11 +18,19 @@ export default function IncomingCallPage({ params }: { params: Promise<{ caseId:
 
   // 통화 진행 화면으로 넘어가자마자 첫 대사가 바로 들리도록, 벨이 울리는 동안 미리 TTS를 요청해둔다.
   useEffect(() => {
-    const phishingCase = getCaseById(caseId);
-    const firstLine = phishingCase?.phoneDialogue.find((line) => line.speaker === "caller");
-    if (!firstLine) return;
-    const { voice, rate } = getStoredTtsPreference();
-    prefetchTts(firstLine.text, voice, rate).catch(() => {});
+    let cancelled = false;
+    fetchCaseDetail(caseId)
+      .then((phishingCase) => {
+        if (cancelled) return;
+        const firstLine = phishingCase?.phoneDialogue.find((line) => line.speaker === "caller");
+        if (!firstLine) return;
+        const { voice, rate } = getStoredTtsPreference();
+        prefetchTts(firstLine.text, voice, rate).catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [caseId]);
 
   return (

@@ -1,18 +1,16 @@
 "use client";
 
-import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { getKakaoAuthorizeUrl } from "@/lib/kakao";
 import { ChatBubbleIcon, ArrowIcon } from "@/components/icons/kakao-icons";
 import { FaCheck } from "react-icons/fa";
 
 const BADGE_LABELS = ["학습 진행률 저장", "완료한 학습 기록", "취약 유형 분석"];
 
 export function GuestSaveProgressCard({
-  onLoggedIn,
   style,
   className = "",
   message = "이번 학습을 저장해보세요!",
 }: {
-  onLoggedIn: () => void;
   style?: React.CSSProperties;
   className?: string;
   message?: string;
@@ -31,8 +29,7 @@ export function GuestSaveProgressCard({
         <button
           type="button"
           onClick={() => {
-            localStorage.setItem(AUTH_STORAGE_KEY, "true");
-            onLoggedIn();
+            window.location.href = getKakaoAuthorizeUrl();
           }}
           className="flex w-fit shrink-0 cursor-pointer items-center bg-[#FEE500] text-xs leading-none font-semibold whitespace-nowrap text-[#3c1e1e] hover:bg-[#f7de04]"
           style={{

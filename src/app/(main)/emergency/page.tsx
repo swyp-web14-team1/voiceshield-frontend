@@ -1,43 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BiSolidPhoneCall } from "react-icons/bi";
 import { FiAlertTriangle } from "react-icons/fi";
 import { ROUTES } from "@/lib/routes";
 import { BackHeader } from "@/components/layout/BackHeader";
+import { fetchReportGuide } from "@/lib/api/report";
+import type { ReportGuideResponse } from "@/lib/api/types";
 
-const EMERGENCY_CONTACTS = [
-  {
-    org: "경찰청",
-    number: "112",
-    tags: ["#즉시 신고", "#긴급 대응"],
-    gradient: "linear-gradient(to top right, #ffcbcc -40%, #df1e21 100%)",
-    border: "none",
-  },
-  {
-    org: "금융감독원",
-    number: "1332",
-    tags: ["#금융 사기 상담", "#계좌 정지"],
-    gradient: "linear-gradient(to top right, #60a5fa 0%, #2849be 100%)",
-    border: "none",
-  },
-];
-
-type TipSegment = { text: string; highlight?: boolean };
-
-const DAMAGE_RESPONSE: TipSegment[][] = [
-  [{ text: "송금했다면 즉시 은행 콜센터에 " }, { text: "지급정지 요청", highlight: true }],
-  [{ text: "속아서 앱을 설치했다면 휴대폰을 " }, { text: "비행기 모드로 전환", highlight: true }],
-  [{ text: "가족 / 지인에게 " }, { text: "상황을 공유하고 도움 요청", highlight: true }],
-  [{ text: "관련 문자 / 통화 기록", highlight: true }, { text: "은 삭제하지 말고 " }, { text: "보관", highlight: true }],
-];
-
-const PREVENTION_TIPS: TipSegment[][] = [
-  [{ text: "공공기관은 전화로 계좌 / 비밀번호를 " }, { text: "절대 묻지 않습니다", highlight: true }],
-  [{ text: "'안전계좌' 이체 요구", highlight: true }, { text: "는 100% 사기입니다" }],
-  [{ text: "링크가 포함된 문자", highlight: true }, { text: "는 누르기 전에 한 번 더 확인하세요" }],
-  [{ text: "가족 이름의 " }, { text: "낯선 번호", highlight: true }, { text: "는 반드시 통화로 확인하세요" }],
-];
+// 백엔드(report-guides API)가 아직 안 떠 있거나 오류일 때 쓰는 폴백 — 기존에 화면에 있던 문구 그대로.
+const FALLBACK_GUIDE: ReportGuideResponse = {
+  reportSteps: [],
+  realActionGuide: [
+    "송금했다면 즉시 은행 콜센터에 지급정지 요청",
+    "속아서 앱을 설치했다면 휴대폰을 비행기 모드로 전환",
+    "가족 / 지인에게 상황을 공유하고 도움 요청",
+    "관련 문자 / 통화 기록은 삭제하지 말고 보관",
+  ],
+  preventionTips: [
+    "공공기관은 전화로 계좌 / 비밀번호를 절대 묻지 않습니다",
+    "'안전계좌' 이체 요구는 100% 사기입니다",
+    "링크가 포함된 문자는 누르기 전에 한 번 더 확인하세요",
+    "가족 이름의 낯선 번호는 반드시 통화로 확인하세요",
+  ],
+  emergencyContacts: [
+    { name: "경찰청", phoneNumber: "112", description: "보이스피싱 및 범죄 신고" },
+    { name: "금융감독원", phoneNumber: "1332", description: "금융사기 상담 및 피해 대응" },
+  ],
+};
 
 function TipCard({
   title,
@@ -46,7 +36,7 @@ function TipCard({
   stripColor,
 }: {
   title: string;
-  tips: TipSegment[][];
+  tips: string[];
   accentColor: string;
   stripColor: string;
 }) {
@@ -64,17 +54,13 @@ function TipCard({
         </p>
       </div>
       <ul className="mt-4 flex flex-col gap-1.75" style={{ paddingInline: "clamp(12px, 4cqw, 34px)" }}>
-        {tips.map((segments, i) => (
+        {tips.map((text, i) => (
           <li
             key={i}
             className="break-keep rounded-lg bg-gray-100 text-center text-sm font-semibold text-[#1a2332]"
             style={{ paddingInline: "clamp(12px, 3cqw, 20px)", paddingBlock: "clamp(8px, 2cqw, 14px)" }}
           >
-            {segments.map((seg, j) => (
-              <span key={j} className={seg.highlight ? "font-bold" : undefined} style={seg.highlight ? { color: accentColor } : undefined}>
-                {seg.text}
-              </span>
-            ))}
+            {text}
           </li>
         ))}
       </ul>
@@ -82,8 +68,52 @@ function TipCard({
   );
 }
 
+const CONTACT_TAGS_FALLBACK: Record<string, string[]> = {
+  "112": ["#즉시 신고", "#긴급 대응"],
+  "1332": ["#금융 사기 상담", "#계좌 정지"],
+};
+
+/** tel: 링크는 클릭해도 성공/실패를 알려주는 방법이 없다 — 터치가 기본 입력수단인 기기(모바일)인지만 판별한다. */
+function isMobileDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
 export default function EmergencyPage() {
   const [target, setTarget] = useState<{ org: string; number: string } | null>(null);
+  const [guide, setGuide] = useState<ReportGuideResponse>(FALLBACK_GUIDE);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchReportGuide()
+      .then((data) => {
+        if (!cancelled) setGuide(data);
+      })
+      .catch(() => {
+        // API 실패 시 이미 기본값(FALLBACK_GUIDE)으로 초기화되어 있으므로 조용히 무시.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const contacts = guide.emergencyContacts.map((c) => ({
+    org: c.name,
+    number: c.phoneNumber,
+    tags: CONTACT_TAGS_FALLBACK[c.phoneNumber] ?? [c.description],
+    gradient:
+      c.phoneNumber === "112"
+        ? "linear-gradient(to top right, #ffcbcc -40%, #df1e21 100%)"
+        : "linear-gradient(to top right, #60a5fa 0%, #2849be 100%)",
+  }));
+  const damageResponseTips = [...guide.reportSteps, ...guide.realActionGuide];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-gray-100">
@@ -94,15 +124,14 @@ export default function EmergencyPage() {
         <p className="pt-1 pb-3 text-sm text-gray-600">보이스피싱 피해 시 즉시 신고하세요</p>
 
         <div className="grid grid-cols-2" style={{ gap: "clamp(8px, 3.6cqw, 15px)" }}>
-          {EMERGENCY_CONTACTS.map((c) => (
+          {contacts.map((c) => (
             <button
               key={c.org}
               type="button"
               onClick={() => setTarget(c)}
-              className="flex flex-col justify-between rounded-lg border-2 text-left shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
+              className="flex flex-col justify-between rounded-lg border-2 border-none text-left shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
               style={{
                 backgroundImage: c.gradient,
-                ...(c.border === "none" ? { borderStyle: "none" } : { borderColor: c.border }),
                 height: "clamp(110px, 30cqw, 136px)",
                 padding: "clamp(12px, 3.6cqw, 16px)",
               }}
@@ -132,8 +161,8 @@ export default function EmergencyPage() {
           ))}
         </div>
 
-        <TipCard title="피해 발생 대응" tips={DAMAGE_RESPONSE} accentColor="#df1e21" stripColor="rgba(223,30,33,0.08)" />
-        <TipCard title="예방 수칙" tips={PREVENTION_TIPS} accentColor="#2563eb" stripColor="rgba(37,99,235,0.1)" />
+        <TipCard title="피해 발생 대응" tips={damageResponseTips} accentColor="#df1e21" stripColor="rgba(223,30,33,0.08)" />
+        <TipCard title="예방 수칙" tips={guide.preventionTips} accentColor="#2563eb" stripColor="rgba(37,99,235,0.1)" />
       </div>
 
       {target && (
@@ -169,11 +198,26 @@ export default function EmergencyPage() {
               </button>
               <a
                 href={`tel:${target.number}`}
+                onClick={(e) => {
+                  if (!isMobileDevice()) {
+                    e.preventDefault();
+                    setToast("이 기능은 모바일 기기에서 사용할 수 있어요");
+                  }
+                  setTarget(null);
+                }}
                 className="flex h-11.25 flex-1 items-center justify-center rounded-lg bg-[#df1e21] text-sm font-bold text-white shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"
               >
                 신고
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-8 z-50 flex justify-center px-6">
+          <div className="rounded-full bg-[#1a2332] px-4 py-2.5 text-sm font-medium text-white shadow-[0px_3px_8px_rgba(0,0,0,0.25)]">
+            {toast}
           </div>
         </div>
       )}

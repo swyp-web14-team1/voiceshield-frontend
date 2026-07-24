@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { FaCircleCheck } from "react-icons/fa6";
-import { CASE_CATEGORY_LABEL } from "@/lib/mock-cases";
-import { CATEGORY_META, INSTITUTION_ICON_SIZE_LEARN } from "@/lib/case-meta";
+import { CASE_CATEGORY_LABEL, CATEGORY_META, INSTITUTION_ICON_SIZE_LEARN } from "@/lib/case-meta";
 import { ROUTES } from "@/lib/routes";
 import { CaseStatsGrid } from "@/components/cards/CaseStatsGrid";
 import { useIsLoggedIn } from "@/lib/auth";

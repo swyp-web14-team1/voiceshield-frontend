@@ -7,6 +7,8 @@ import { Prata } from "next/font/google";
 import { IoCheckmark } from "react-icons/io5";
 import { ROUTES } from "@/lib/routes";
 import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { withdrawMembership } from "@/lib/api/auth";
+import { setStoredUserId } from "@/lib/api/client";
 import { BackHeader } from "@/components/layout/BackHeader";
 
 const prata = Prata({ weight: "400", subsets: ["latin"] });
@@ -25,8 +27,25 @@ export default function AccountDeletionPage() {
   const [reason, setReason] = useState<(typeof REASONS)[number] | null>(null);
   const [detail, setDetail] = useState("");
   const [showComplete, setShowComplete] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!reason || isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await withdrawMembership();
+      setShowComplete(true);
+    } catch {
+      setSubmitError("탈퇴 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleConfirm = () => {
+    setStoredUserId(null);
     localStorage.setItem(AUTH_STORAGE_KEY, "false");
     router.push(ROUTES.login);
   };
@@ -77,6 +96,8 @@ export default function AccountDeletionPage() {
                 />
               </div>
             )}
+
+            {submitError && <p className="text-sm font-medium text-[#df1e21]">{submitError}</p>}
           </div>
 
           <div className="mt-3.5 flex items-center justify-center gap-3.5">
@@ -88,11 +109,11 @@ export default function AccountDeletionPage() {
             </Link>
             <button
               type="button"
-              disabled={!reason}
-              onClick={() => setShowComplete(true)}
+              disabled={!reason || isSubmitting}
+              onClick={handleSubmit}
               className="flex h-11 w-31.75 items-center justify-center rounded-lg bg-[#60a5fa] text-sm font-bold text-white shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] transition-shadow disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)_and_(pointer:fine)]:enabled:hover:shadow-[0px_1px_1.5px_rgba(0,0,0,0.1),inset_0_0_0_999px_rgba(0,0,0,0.12)]"
             >
-              제출하기
+              {isSubmitting ? "처리 중..." : "제출하기"}
             </button>
           </div>
         </section>

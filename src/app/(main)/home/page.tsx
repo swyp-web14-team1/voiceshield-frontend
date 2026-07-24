@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FiBookOpen } from "react-icons/fi";
-import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
+import { fetchAllCaseSummaries } from "@/lib/api/case-data";
+import { fetchMyProfile } from "@/lib/api/auth";
 import { AiOutlineStock } from "react-icons/ai";
 import { GoOrganization } from "react-icons/go";
 import {
   CategoryDeliveryIcon,
   CategoryFamilyIcon,
   CategoryMessengerIcon,
-  ChevronIcon,
 } from "@/components/icons/home-icons";
 import { DIFFICULTY_META, INSTITUTION_ICON_SIZE } from "@/lib/case-meta";
 import { ContinueLearningCard } from "@/components/cards/ContinueLearningCard";
@@ -21,14 +21,14 @@ import {
   applyProgressOverride,
   applyProgressOverrideToAll,
   getTodayCompletedCount,
+  pickMostRecentCaseId,
   readProgressSnapshot,
   type ProgressSnapshot,
 } from "@/lib/progress";
 import { getTodayStudyMinutes } from "@/lib/daily-stats";
-import type { CaseCategory } from "@/types";
+import type { CaseCategory, PhishingCase } from "@/types";
 import { IoIosArrowForward } from "react-icons/io";
 
-const DEFAULT_CONTINUE_CASE_ID = "institution-01";
 const EMPTY_PROGRESS_SNAPSHOT: ProgressSnapshot = { recentInProgressCaseId: null, overrides: {} };
 
 const DEFAULT_ICON_SIZE = "clamp(14px, 4cqw, 20px)";
@@ -47,13 +47,13 @@ const CATEGORY_TILES: {
   { label: "메신저사기", category: "messenger", Icon: CategoryMessengerIcon, bg: "#8e51ff" },
 ];
 
-const RECOMMENDED_CASES = [...MOCK_CASES].sort((a, b) => b.recommendation - a.recommendation).slice(0, 2);
-
-
 export default function HomePage() {
+  const [cases, setCases] = useState<PhishingCase[]>([]);
+  const [casesLoaded, setCasesLoaded] = useState(false);
   const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
   const [todayStudyMinutes, setTodayStudyMinutes] = useState(0);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const isLoggedIn = useIsLoggedIn();
 
   useEffect(() => {
@@ -61,24 +61,49 @@ export default function HomePage() {
     setProgress(readProgressSnapshot());
     setTodayStudyMinutes(getTodayStudyMinutes());
     setTodayCompletedCount(getTodayCompletedCount());
+    fetchAllCaseSummaries()
+      .then(setCases)
+      .catch(() => setCases([]))
+      .finally(() => setCasesLoaded(true));
   }, []);
 
-  const continueCaseId = progress.recentInProgressCaseId ?? DEFAULT_CONTINUE_CASE_ID;
-  const continueCase = applyProgressOverride(getCaseById(continueCaseId)!, progress);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetchMyProfile()
+      .then((profile) => setDisplayName(profile.nickname || profile.name || null))
+      .catch(() => {});
+  }, [isLoggedIn]);
 
-  const casesWithProgress = applyProgressOverrideToAll(progress);
+  // 진행 중인 케이스가 없으면(전부 완료) 완료 여부와 무관하게 가장 최근에 학습한 케이스를 대신 보여준다.
+  const continueCaseId = progress.recentInProgressCaseId ?? pickMostRecentCaseId(progress);
+  const continueCaseHeading = progress.recentInProgressCaseId ? "이어서 학습하기" : "최근 학습한 사례";
+  const continueCaseBase = cases.find((c) => c.id === continueCaseId) ?? cases[0];
+  const continueCase = continueCaseBase ? applyProgressOverride(continueCaseBase, progress) : null;
+  // 진행 중이던 케이스는 상세 페이지가 아니라 중단했던 채널(전화/문자)의 시뮬레이션으로 바로 들어간다.
+  const continueResume = continueCaseId ? progress.overrides[continueCaseId]?.resume : undefined;
+  const continueHref =
+    continueCase && continueResume
+      ? continueResume.channel === "message"
+        ? ROUTES.messageProgress(continueCase.id)
+        : ROUTES.callProgress(continueCase.id)
+      : continueCase
+        ? ROUTES.scenario(continueCase.id)
+        : "";
+
+  const casesWithProgress = applyProgressOverrideToAll(cases, progress);
   const totalCaseCount = casesWithProgress.length;
   const completedCaseCount = casesWithProgress.filter((c) => c.isCompleted).length;
   const overallProgressPercent =
     totalCaseCount > 0 ? Math.round((completedCaseCount / totalCaseCount) * 100) : 0;
+  const recommendedCases = [...cases].sort((a, b) => b.recommendation - a.recommendation).slice(0, 2);
 
   return (
     <main className="no-scrollbar flex min-h-0 flex-1 flex-col gap-3.5 [@media(min-height:950px)_and_(hover:none)_and_(pointer:coarse)]:flex-none overflow-y-auto bg-gray-100 px-4 py-8 @max-[410px]:py-4">
       <section className="flex flex-col gap-1 rounded-xl bg-white pb-4 p-5 shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]">
-        <p className="text-xs font-medium text-[#64748B]">피싱안전지킴이</p>
+        <p className="text-xs font-medium text-[#64748B]">피싱안심교실</p>
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl font-bold text-[#1a2332]">
-            안녕하세요, <span className="text-blue-600">{isLoggedIn ? "홍길동" : "게스트"}</span> 님!
+            안녕하세요, <span className="text-blue-600">{isLoggedIn ? (displayName ?? "회원") : "게스트"}</span> 님!
           </h1>
           {!isLoggedIn && (
             <Link
@@ -121,10 +146,15 @@ export default function HomePage() {
         </section>
       )}
 
-      {isLoggedIn && (
+      {isLoggedIn && !casesLoaded && (
+        // 사례 목록을 API로 받아오는 동안 카드가 없다가 갑자기 나타나면서 아래 섹션이 밀리는 걸 막기 위한
+        // 자리 예약용 스켈레톤 — ContinueLearningCard(light)와 비슷한 높이로 맞춰둔다.
+        <div className="h-34.5 animate-pulse rounded-xl bg-white shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]" />
+      )}
+      {isLoggedIn && casesLoaded && continueCase && (
         <ContinueLearningCard
-          heading="이어서 학습하기"
-          href={ROUTES.scenario(continueCase.id)}
+          heading={continueCaseHeading}
+          href={continueHref}
           phishingCase={continueCase}
           difficultyLabel={DIFFICULTY_META[continueCase.difficulty].label}
           difficultyColor={DIFFICULTY_META[continueCase.difficulty].bg}
@@ -193,7 +223,7 @@ export default function HomePage() {
           오늘의 추천학습
         </p>
         <div className="mt-3 flex flex-col gap-2.25">
-          {RECOMMENDED_CASES.map((c) => (
+          {recommendedCases.map((c) => (
             <RecommendedCard key={c.id} href={ROUTES.scenario(c.id)} phishingCase={c} />
           ))}
         </div>

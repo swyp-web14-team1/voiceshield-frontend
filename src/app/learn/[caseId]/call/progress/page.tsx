@@ -6,16 +6,21 @@ import { FiX } from "react-icons/fi";
 import { MdOutlineReplay } from "react-icons/md";
 import { BsFillPersonFill } from "react-icons/bs";
 import { IoVolumeMute, IoVolumeHigh } from "react-icons/io5";
-import { getCaseById, CASE_CATEGORY_LABEL } from "@/lib/mock-cases";
+import { fetchCaseDetail } from "@/lib/api/case-data";
+import { evaluateChoice } from "@/lib/api/cases";
+import { markSimulationComplete } from "@/lib/api/learning";
+import { getStoredUserId } from "@/lib/api/client";
+import { CASE_CATEGORY_LABEL } from "@/lib/case-meta";
 import { ROUTES } from "@/lib/routes";
 import { getStoredTtsPreference, prefetchTts, unlockMobileAudio } from "@/lib/tts";
 import { WAVEFORM_BAR_PATHS } from "@/lib/waveform-bars";
-import { recordCaseProgress } from "@/lib/progress";
+import { readProgressSnapshot, recordCaseProgress } from "@/lib/progress";
 import { useStudyTimeTracker } from "@/lib/daily-stats";
 import { QuizCard } from "@/components/learn/QuizCard";
 import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
 import { SimulationCompleteActions } from "@/components/learn/SimulationCompleteActions";
 import { QuizResultCard } from "@/components/learn/QuizResultCard";
+import type { PhishingCase } from "@/types";
 
 type Phase = "dialogue" | "quiz" | "complete";
 
@@ -65,14 +70,15 @@ function CallWaveform({ active }: { active: boolean }) {
 export default function CallSimulationProgressPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
   const router = useRouter();
-  const phishingCase = getCaseById(caseId);
-  if (!phishingCase) notFound();
 
   useStudyTimeTracker();
 
+  const [phishingCase, setPhishingCase] = useState<PhishingCase | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [phase, setPhase] = useState<Phase>("dialogue");
   const [quizIndex, setQuizIndex] = useState(0);
-  const [answers, setAnswers] = useState<(number | null)[]>(() => Array(phishingCase.quiz.length).fill(null));
+  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [explanations, setExplanations] = useState<Record<number, string>>({});
   const [muted, setMuted] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [playingLineIndex, setPlayingLineIndex] = useState<number | null>(null);
@@ -85,8 +91,44 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
   const dialogueScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    recordCaseProgress(caseId, phase);
-  }, [caseId, phase]);
+    let cancelled = false;
+    fetchCaseDetail(caseId)
+      .then((c) => {
+        if (cancelled) return;
+        if (!c) {
+          setLoadFailed(true);
+          return;
+        }
+        setPhishingCase(c);
+
+        // "이어하기"로 들어온 경우 중단했던 정확한 지점(화자, 퀴즈 번호, 답변)부터 재개한다.
+        const resume = readProgressSnapshot().overrides[caseId]?.resume;
+        if (resume && resume.channel === "voice" && resume.answers.length === c.quiz.length) {
+          // 선택 직후(900ms 텀) 저장 타이밍과 겹쳐 이미 답한 문항에 quizIndex가 멈춰있을 수 있어 한 칸 보정한다.
+          const startIndex =
+            resume.quizIndex < c.quiz.length && resume.answers[resume.quizIndex] !== null
+              ? resume.quizIndex + 1
+              : resume.quizIndex;
+          setAnswers(resume.answers);
+          setQuizIndex(Math.min(startIndex, c.quiz.length));
+          setRevealedCount(resume.revealedCount);
+          setPhase(resume.phase === "quiz" || resume.phase === "complete" ? resume.phase : "dialogue");
+        } else {
+          setAnswers(Array(c.quiz.length).fill(null));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId]);
+
+  useEffect(() => {
+    if (!phishingCase) return;
+    recordCaseProgress(caseId, phase, { channel: "voice", revealedCount, quizIndex, answers });
+  }, [caseId, phase, revealedCount, quizIndex, answers, phishingCase]);
 
   // 수신 전화 화면의 "시작하기" 버튼을 거치지 않고 이 화면에 직접 진입하거나(새로고침 등) 그 제스처의
   // 잠금 해제가 유지되지 않는 브라우저를 위한 보완책 — 이 화면에서 처음 탭/클릭하는 순간에도 한 번 더
@@ -116,9 +158,11 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
     };
   }, []);
 
-  const currentQuestion = phishingCase.quiz[quizIndex];
-  const correctCount = answers.filter((answer, i) => answer === phishingCase.quiz[i].answerIndex).length;
-  const lastDialogueIndex = phishingCase.phoneDialogue.length - 1;
+  const currentQuestion = phishingCase?.quiz[quizIndex];
+  const correctCount = phishingCase
+    ? answers.filter((answer, i) => answer === phishingCase.quiz[i].answerIndex).length
+    : 0;
+  const lastDialogueIndex = (phishingCase?.phoneDialogue.length ?? 0) - 1;
 
   const scrollLineToTop = (index: number) => {
     const container = dialogueScrollRef.current;
@@ -213,14 +257,16 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
   };
 
   useEffect(() => {
-    if (phase !== "dialogue") return;
+    if (phase !== "dialogue" || !phishingCase) return;
+    const activeCase = phishingCase;
     let cancelled = false;
 
     const runDialogue = async () => {
-      for (let i = 0; i < phishingCase.phoneDialogue.length; i++) {
+      // "이어하기"로 재개한 경우 이미 본 대사(revealedCount)는 다시 재생하지 않고 그 다음부터 이어간다.
+      for (let i = revealedCount; i < activeCase.phoneDialogue.length; i++) {
         if (cancelled || exitedRef.current) return;
         setRevealedCount(i + 1);
-        const line = phishingCase.phoneDialogue[i];
+        const line = activeCase.phoneDialogue[i];
         if (line.speaker === "caller") {
           if (i === 0) {
 
@@ -228,7 +274,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
             if (cancelled || exitedRef.current) return;
           }
 
-          const nextCaller = phishingCase.phoneDialogue.slice(i + 1).find((l) => l.speaker === "caller");
+          const nextCaller = activeCase.phoneDialogue.slice(i + 1).find((l) => l.speaker === "caller");
           if (nextCaller) {
             const { voice, rate } = getStoredTtsPreference();
             prefetchTts(nextCaller.text, voice, rate).catch(() => {});
@@ -239,7 +285,8 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
         }
         if (cancelled || exitedRef.current) return;
       }
-      if (!cancelled && !exitedRef.current) setPhase("quiz");
+      // 백엔드에 판단 퀴즈가 없는 시나리오(scenario-step.quiz가 null)는 퀴즈 단계를 건너뛰고 바로 완료 처리한다.
+      if (!cancelled && !exitedRef.current) setPhase(activeCase.quiz.length > 0 ? "quiz" : "complete");
     };
 
     runDialogue();
@@ -249,7 +296,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, phishingCase.id]);
+  }, [phase, phishingCase]);
 
   const playDing = () => {
     if (mutedRef.current) return;
@@ -304,7 +351,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
   };
 
   const handleSelect = (choiceIndex: number) => {
-    if (answers[quizIndex] !== null) return;
+    if (answers[quizIndex] !== null || !phishingCase) return;
     const next = [...answers];
     next[quizIndex] = choiceIndex;
     setAnswers(next);
@@ -315,21 +362,45 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
       playBuzz();
     }
 
+    const optionId = currentQuestion?.optionIds?.[choiceIndex];
+    if (optionId) {
+      const answeredIndex = quizIndex;
+      evaluateChoice(phishingCase.id, "VOICE", optionId)
+        .then((res) => {
+          if (res.explanation) {
+            setExplanations((prev) => ({ ...prev, [answeredIndex]: res.explanation as string }));
+          }
+        })
+        .catch(() => {});
+    }
+
     setTimeout(() => {
       if (quizIndex + 1 < phishingCase.quiz.length) {
         setQuizIndex((i) => i + 1);
       } else {
         setPhase("complete");
+        if (getStoredUserId()) markSimulationComplete(phishingCase.id).catch(() => {});
       }
     }, 900);
   };
 
   const handleRestart = () => {
+    if (!phishingCase) return;
     setAnswers(Array(phishingCase.quiz.length).fill(null));
+    setExplanations({});
     setQuizIndex(0);
     setRevealedCount(0);
     setPhase("dialogue");
   };
+
+  if (loadFailed) notFound();
+  if (!phishingCase) {
+    return (
+      <div className="flex h-full items-center justify-center bg-gray-100">
+        <p className="text-sm text-gray-500">불러오는 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-gray-100">
@@ -473,7 +544,7 @@ export default function CallSimulationProgressPage({ params }: { params: Promise
                     question={q.question}
                     isCorrect={isCorrect}
                     chosenLabel={chosen !== null ? q.choices[chosen] : "선택하지 않음"}
-                    explanation={q.explanation}
+                    explanation={explanations[i] ?? q.explanation}
                   />
                 );
               })}

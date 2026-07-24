@@ -4,14 +4,19 @@ import { use, useEffect, useRef, useState } from "react";
 import { useRouter, notFound } from "next/navigation";
 import { FiX } from "react-icons/fi";
 import { BsFillPersonFill } from "react-icons/bs";
-import { getCaseById, CASE_CATEGORY_LABEL } from "@/lib/mock-cases";
+import { fetchCaseDetail } from "@/lib/api/case-data";
+import { evaluateChoice } from "@/lib/api/cases";
+import { markSimulationComplete } from "@/lib/api/learning";
+import { getStoredUserId } from "@/lib/api/client";
+import { CASE_CATEGORY_LABEL } from "@/lib/case-meta";
 import { ROUTES } from "@/lib/routes";
-import { recordCaseProgress } from "@/lib/progress";
+import { readProgressSnapshot, recordCaseProgress } from "@/lib/progress";
 import { useStudyTimeTracker } from "@/lib/daily-stats";
 import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
 import { QuizCard } from "@/components/learn/QuizCard";
 import { SimulationCompleteActions } from "@/components/learn/SimulationCompleteActions";
 import { QuizResultCard } from "@/components/learn/QuizResultCard";
+import type { PhishingCase } from "@/types";
 
 const HEADER_GRADIENT = "linear-gradient(165deg, #1a2035 0%, #2d1f4e 100%)";
 const REVEAL_INTERVAL_MS = 1800;
@@ -30,48 +35,98 @@ const TODAY_LABEL = new Intl.DateTimeFormat("ko-KR", {
 export default function MessageSimulationProgressPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
   const router = useRouter();
-  const phishingCase = getCaseById(caseId);
-  if (!phishingCase) notFound();
 
   useStudyTimeTracker();
 
+  const [phishingCase, setPhishingCase] = useState<PhishingCase | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [revealedCount, setRevealedCount] = useState(0);
   const [showQuiz, setShowQuiz] = useState(false);
   const [answer, setAnswer] = useState<number | null>(null);
   const [revealComplete, setRevealComplete] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [realExplanation, setRealExplanation] = useState<string | null>(null);
   const exitedRef = useRef(false);
 
   const isDone = revealComplete;
-  const isCorrect = answer !== null && answer === phishingCase.textQuiz.answerIndex;
-  const allRevealed = revealedCount >= phishingCase.textMessages.length;
+  const allRevealed = phishingCase ? revealedCount >= phishingCase.textMessages.length : false;
 
   useEffect(() => {
-    recordCaseProgress(caseId, isDone ? "complete" : "dialogue");
-  }, [caseId, isDone]);
+    let cancelled = false;
+    fetchCaseDetail(caseId)
+      .then((c) => {
+        if (cancelled) return;
+        if (!c) {
+          setLoadFailed(true);
+          return;
+        }
+        setPhishingCase(c);
+
+        // "이어하기"로 들어온 경우 중단했던 정확한 지점(메시지 노출 개수, 답변 여부)부터 재개한다.
+        const resume = readProgressSnapshot().overrides[caseId]?.resume;
+        if (resume && resume.channel === "message") {
+          setRevealedCount(resume.revealedCount);
+          const previousAnswer = resume.answers[0] ?? null;
+          if (previousAnswer !== null) {
+            // 이미 답까지 골랐던 상태라면 다시 대화를 재생하지 않고 바로 결과 화면으로 보낸다.
+            setAnswer(previousAnswer);
+            setRevealComplete(true);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId]);
 
   useEffect(() => {
-    if (allRevealed || exitedRef.current) return;
+    if (!phishingCase) return;
+    recordCaseProgress(caseId, isDone ? "complete" : "dialogue", {
+      channel: "message",
+      revealedCount,
+      quizIndex: 0,
+      answers: [answer],
+    });
+  }, [caseId, isDone, revealedCount, answer, phishingCase]);
+
+  useEffect(() => {
+    if (!phishingCase || allRevealed || exitedRef.current) return;
     const timer = setTimeout(() => {
       if (exitedRef.current) return;
       setRevealedCount((c) => c + 1);
     }, REVEAL_INTERVAL_MS);
     return () => clearTimeout(timer);
-  }, [revealedCount, allRevealed]);
+  }, [revealedCount, allRevealed, phishingCase]);
 
   useEffect(() => {
-    if (!allRevealed || exitedRef.current) return;
+    if (!phishingCase || !allRevealed || exitedRef.current) return;
     const timer = setTimeout(() => {
       if (!exitedRef.current) setShowQuiz(true);
     }, QUIZ_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [allRevealed]);
+  }, [allRevealed, phishingCase]);
 
   const handleSelect = (choiceIndex: number) => {
-    if (!showQuiz || answer !== null) return;
+    if (!showQuiz || answer !== null || !phishingCase) return;
     setAnswer(choiceIndex);
+
+    const optionId = phishingCase.textQuiz.optionIds?.[choiceIndex];
+    if (optionId) {
+      evaluateChoice(phishingCase.id, "MESSAGE", optionId)
+        .then((res) => {
+          if (res.explanation) setRealExplanation(res.explanation);
+        })
+        .catch(() => {});
+    }
+
     setTimeout(() => {
-      if (!exitedRef.current) setRevealComplete(true);
+      if (!exitedRef.current) {
+        setRevealComplete(true);
+        if (getStoredUserId()) markSimulationComplete(phishingCase.id).catch(() => {});
+      }
     }, ANSWER_REVEAL_DELAY_MS);
   };
 
@@ -80,7 +135,19 @@ export default function MessageSimulationProgressPage({ params }: { params: Prom
     setShowQuiz(false);
     setAnswer(null);
     setRevealComplete(false);
+    setRealExplanation(null);
   };
+
+  if (loadFailed) notFound();
+  if (!phishingCase) {
+    return (
+      <div className="flex h-full items-center justify-center bg-gray-100">
+        <p className="text-sm text-gray-500">불러오는 중...</p>
+      </div>
+    );
+  }
+
+  const isCorrect = answer !== null && answer === phishingCase.textQuiz.answerIndex;
 
   return (
     <div className="flex h-full flex-col bg-gray-100">
@@ -171,7 +238,7 @@ export default function MessageSimulationProgressPage({ params }: { params: Prom
               question={phishingCase.textQuiz.question}
               isCorrect={isCorrect}
               chosenLabel={phishingCase.textQuiz.choices[answer ?? 0]}
-              explanation={phishingCase.textQuiz.explanation}
+              explanation={realExplanation ?? phishingCase.textQuiz.explanation}
               stackOnNarrow
             />
           </div>

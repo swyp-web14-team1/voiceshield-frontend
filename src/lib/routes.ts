@@ -4,6 +4,7 @@
  */
 export const ROUTES = {
   login: "/", // US-01 회원가입/로그인
+  kakaoCallback: "/auth/kakao/callback", // US-01 카카오 로그인 콜백(인가 코드 수신)
 
   home: "/home", // US-02 메인 화면
 

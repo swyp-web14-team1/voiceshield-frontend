@@ -22,6 +22,8 @@ export interface QuizQuestion {
   choices: string[];
   answerIndex: number;
   explanation: string;
+  /** 실제 API에서 온 퀴즈일 때만 존재 — choices와 같은 순서의 실제 optionId. choices 평가 API(evaluateChoice) 호출에 필요. */
+  optionIds?: string[];
 }
 
 export interface PhishingCase {

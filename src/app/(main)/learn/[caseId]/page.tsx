@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { BiPhoneCall } from "react-icons/bi";
 import { LuMessageSquareMore } from "react-icons/lu";
-import { getCaseById } from "@/lib/mock-cases";
+import { fetchCaseDetail } from "@/lib/api/case-data";
 import { CATEGORY_META, INSTITUTION_ICON_SIZE_LEARN } from "@/lib/case-meta";
 import { ROUTES } from "@/lib/routes";
 import { BackHeader } from "@/components/layout/BackHeader";
@@ -10,7 +10,7 @@ import { CaseStatsGrid } from "@/components/cards/CaseStatsGrid";
 
 export default async function ScenarioDetailPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;
-  const phishingCase = getCaseById(caseId);
+  const phishingCase = await fetchCaseDetail(caseId);
   if (!phishingCase) notFound();
 
   const category = CATEGORY_META[phishingCase.category];

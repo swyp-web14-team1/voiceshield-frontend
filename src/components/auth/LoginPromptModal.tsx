@@ -1,17 +1,15 @@
 "use client";
 
 import { FiX } from "react-icons/fi";
-import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { getKakaoAuthorizeUrl } from "@/lib/kakao";
 import { ChatBubbleIcon, ArrowIcon } from "@/components/icons/kakao-icons";
 
 export function LoginPromptModal({
   open,
   onClose,
-  onLoggedIn,
 }: {
   open: boolean;
   onClose: () => void;
-  onLoggedIn: () => void;
 }) {
   if (!open) return null;
 
@@ -44,8 +42,7 @@ export function LoginPromptModal({
             <button
               type="button"
               onClick={() => {
-                localStorage.setItem(AUTH_STORAGE_KEY, "true");
-                onLoggedIn();
+                window.location.href = getKakaoAuthorizeUrl();
               }}
               className="flex w-full items-center justify-between bg-[#FEE500] text-xs font-semibold text-[#3c1e1e] hover:bg-[#f7de04]"
               style={{

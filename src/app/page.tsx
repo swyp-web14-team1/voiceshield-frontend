@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ROUTES } from "@/lib/routes";
 import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { getKakaoAuthorizeUrl } from "@/lib/kakao";
 import { ChatBubbleIcon, ArrowIcon } from "@/components/icons/kakao-icons";
 
 const ICON_SIZE = "1.5em";
@@ -13,11 +13,8 @@ const GUEST_TEXT_OFFSET = `calc(${ICON_SIZE} + ${ICON_GAP})`;
 
 
 export default function LoginPage() {
-  const router = useRouter();
-
   const handleKakaoLogin = () => {
-    localStorage.setItem(AUTH_STORAGE_KEY, "true");
-    router.push(ROUTES.home);
+    window.location.href = getKakaoAuthorizeUrl();
   };
 
   const handleGuestStart = () => {

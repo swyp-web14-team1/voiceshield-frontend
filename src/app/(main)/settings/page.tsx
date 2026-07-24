@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
 import { IoVolumeMedium, IoVolumeMediumOutline } from "react-icons/io5";
 import { ROUTES } from "@/lib/routes";
-import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { AUTH_STORAGE_KEY, useIsomorphicLayoutEffect } from "@/lib/auth";
+import { setStoredUserId } from "@/lib/api/client";
 import { TTS_SPEEDS, TTS_VOICES, TTS_VOICE_STORAGE_KEY, TTS_SPEED_STORAGE_KEY } from "@/lib/tts";
 import { BackHeader } from "@/components/layout/BackHeader";
 import { FONT_SIZES, useFontScale } from "@/components/providers/FontScaleProvider";
@@ -71,6 +72,10 @@ function PillButton({
     <button
       type="button"
       onClick={onClick}
+      // 저장된 값을 마운트 즉시(lazy initializer로) 읽어와서 쓰는 곳(TTS 음성 선택 등)이 있어, 서버 렌더 결과와
+      // 클라이언트 첫 렌더 결과가 다를 수 있다 — 화면에는 항상 클라이언트의 올바른 값이 바로 그려지므로
+      // (깜빡였다가 나중에 바뀌는 게 아니라 처음부터 맞는 값으로 그려짐) 하이드레이션 경고만 억제한다.
+      suppressHydrationWarning
       className={`flex h-7.5 ${width} shrink-0 items-center justify-center px-2.5 ${textClassName} font-semibold shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)] transition-colors ${
         rounded === "full" ? "rounded-full" : "rounded-[5px]"
       } ${
@@ -97,7 +102,12 @@ export default function SettingsPage() {
   const router = useRouter();
   const { fontSize, setFontSize } = useFontScale();
   const [ttsSpeed, setTtsSpeed] = useState<(typeof TTS_SPEEDS)[number]>("X 1.0");
-  const [ttsVoice, setTtsVoice] = useState<(typeof TTS_VOICES)[number]>("V1");
+
+  const [ttsVoice, setTtsVoice] = useState<(typeof TTS_VOICES)[number]>(() => {
+    if (typeof window === "undefined") return "V1";
+    const stored = localStorage.getItem(TTS_VOICE_STORAGE_KEY);
+    return stored && (TTS_VOICES as readonly string[]).includes(stored) ? (stored as (typeof TTS_VOICES)[number]) : "V1";
+  });
   const [playingVoice, setPlayingVoice] = useState<(typeof TTS_VOICES)[number] | null>(null);
   const [loadingVoice, setLoadingVoice] = useState<(typeof TTS_VOICES)[number] | null>(null);
   const [reminderOn, setReminderOn] = useState(false);
@@ -114,6 +124,13 @@ export default function SettingsPage() {
     };
   }, []);
 
+
+  useIsomorphicLayoutEffect(() => {
+    if (localStorage.getItem(AUTH_STORAGE_KEY) === "true") {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (localStorage.getItem(REMINDER_STORAGE_KEY) === "true") {
       setReminderOn(true);
@@ -123,17 +140,10 @@ export default function SettingsPage() {
     const now = new Date();
     setHour(storedHour ? Number(storedHour) : now.getHours());
     setMinute(storedMinute ? Number(storedMinute) : now.getMinutes());
-    if (localStorage.getItem(AUTH_STORAGE_KEY) === "true") {
-      setIsLoggedIn(true);
-    }
 
     const storedSpeed = localStorage.getItem(TTS_SPEED_STORAGE_KEY);
     if (storedSpeed && (TTS_SPEEDS as readonly string[]).includes(storedSpeed)) {
       setTtsSpeed(storedSpeed as (typeof TTS_SPEEDS)[number]);
-    }
-    const storedVoice = localStorage.getItem(TTS_VOICE_STORAGE_KEY);
-    if (storedVoice && (TTS_VOICES as readonly string[]).includes(storedVoice)) {
-      setTtsVoice(storedVoice as (typeof TTS_VOICES)[number]);
     }
   }, []);
 
@@ -163,7 +173,7 @@ export default function SettingsPage() {
     });
   };
 
-  // 앱(탭)이 열려 있는 동안에만 동작하는 로컬 알림 예약 — 매일 지정 시각에 도달하면 알림을 띄우고 다음 날로 재예약한다.
+
   useEffect(() => {
     if (!isLoggedIn || !reminderOn) return;
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -199,9 +209,7 @@ export default function SettingsPage() {
     const turningOn = !reminderOn;
 
     if (turningOn) {
-      // 홈 화면에 추가하지 않은 모바일 브라우저 탭에서는 알림을 켜도 탭이 닫히는 순간 예약이 사라진다 —
-      // 이런 상태에서 토글만 "활성화"로 켜두면 실제로는 안 오는 알림을 사용자가 오는 줄 알게 된다.
-      // 설치 안내만 띄우고, 실제로 홈 화면에 추가해 standalone으로 열기 전까지는 토글을 켜지 않는다.
+
       const isMobile = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
       const isStandalone =
         typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches;
@@ -214,6 +222,13 @@ export default function SettingsPage() {
     setReminderOn(turningOn);
     localStorage.setItem(REMINDER_STORAGE_KEY, String(turningOn));
     if (!turningOn) return;
+
+    // 켤 때마다 알림 시각을 현재 시각으로 초기화한다 — 꺼져 있던 동안 지난 예전 설정 시각이 그대로 남아있지 않도록.
+    const now = new Date();
+    setHour(now.getHours());
+    setMinute(now.getMinutes());
+    localStorage.setItem(REMINDER_HOUR_STORAGE_KEY, String(now.getHours()));
+    localStorage.setItem(REMINDER_MINUTE_STORAGE_KEY, String(now.getMinutes()));
 
     if (typeof window !== "undefined" && "Notification" in window) {
       try {
@@ -426,6 +441,7 @@ export default function SettingsPage() {
               onClick={() => {
                 localStorage.setItem(AUTH_STORAGE_KEY, "false");
                 localStorage.setItem(REMINDER_STORAGE_KEY, "false");
+                setStoredUserId(null);
                 router.push(ROUTES.login);
               }}
               className="flex items-center justify-center rounded-xl bg-white py-4 text-base font-bold text-[#df1e21] shadow-[0px_1px_1.5px_rgba(0,0,0,0.1)]"

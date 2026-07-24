@@ -2,6 +2,116 @@
 
 기능을 구현하거나 수정할 때마다 아래 형식으로 최상단에 추가한다 (기존 내용은 지우지 않음).
 
+## [2026-07-25] 홈/학습하기 — "이어서 학습하기·최근 학습한 사례" 카드가 API 로딩 중 늦게 나타나며 밀리던 것 스켈레톤으로 해결
+- 수정 파일: `src/app/(main)/home/page.tsx`, `src/app/(main)/learn/page.tsx`
+- 변경 내용: isLoggedIn 타이밍 문제와 별개로, 이 카드는 `fetchAllCaseSummaries()`(실제 API 호출)가 끝나야 렌더링 여부가 결정되는 `cases` 배열에 의존해서, 로딩 중엔 카드 없이 렌더링됐다가 데이터가 도착하면 갑자기 나타나면서 그 아래 "카테고리별 학습"/사례 목록이 밀리는 게 실측 확인됨(홈 기준 151px). 로딩 상태(`casesLoaded`)를 추가해, 로딩 중에는 카드와 같은 높이의 스켈레톤(`animate-pulse` 회색 박스)을 자리에 미리 채워두고 데이터 도착 시 그 자리에서 실제 카드로 바뀌도록 수정 — 아래 콘텐츠가 전혀 안 밀림. `/learn`은 추가로, 로딩 중에 `filteredCases.length === 0`이 일시적으로 참이 되어 "검색 결과가 없어요"가 잘못 뜨던 것도 `casesLoaded` 체크로 같이 방지.
+- 비고: Playwright로 스켈레톤 높이를 실제 카드 높이에 맞춰 튜닝(홈 138px, 학습하기 56px)하고, 앱 내 클릭 이동 후 아래 섹션/카드 위치를 25회 연속 샘플링해 로딩 시작부터 끝까지 단 1px도 움직이지 않는 것까지 확인함.
+
+## [2026-07-25] 회원 전용 섹션 밀림 버그 — 공용 훅 말고 자체 isLoggedIn state를 쓰던 페이지 3곳 추가 수정
+- 수정 파일: `src/lib/auth.ts`(`useIsomorphicLayoutEffect` export), `src/app/(main)/settings/page.tsx`, `src/app/(main)/record/page.tsx`, `src/app/learn/[caseId]/call/quiz/page.tsx`
+- 변경 내용: 바로 전 커밋에서 공용 `useIsLoggedIn()` 훅만 `useLayoutEffect`로 고쳤는데, `settings`/`record`/`call/quiz` 세 페이지는 이 훅을 안 쓰고 각자 `useState(false)` + `useEffect`로 로그인 상태를 따로 읽고 있어서 수정이 적용되지 않았음(그래서 "모든 페이지에서" 게스트 화면이 잠깐 보였다 회원 화면으로 바뀐다는 재현 보고로 이어짐). `lib/auth.ts`의 isomorphic layout-effect 헬퍼를 export해서 세 페이지 모두 재사용하도록 통일 — `settings`/`record`는 다른 값(알림 시간, 진행 기록 등)과 같은 effect에 묶여 있던 isLoggedIn 읽기만 분리해 별도 layout-effect로 옮김.
+- 비고: Playwright로 재검증 — `/record`는 게스트용 블러 클래스(`pointer-events-none select-none`)가 첫 페인트에 전혀 없는 것, `/settings`는 "매일 학습 알림" 카드가 첫 페인트부터 바로 있는 것 확인함. `/emergency`는 로그인 여부로 갈리는 콘텐츠가 아예 없어 이 버그의 영향을 받지 않음(수정 불필요).
+
+## [2026-07-25] 페이지 로드 시 레이아웃 밀림(CLS) 두 건 수정 — 글자 크기 깜빡임, 회원 전용 섹션 늦게 나타나는 문제
+- 수정 파일: `src/components/providers/FontScaleProvider.tsx`, `src/lib/auth.ts`
+- 변경 내용:
+  - **글자 크기**: `layout.tsx`의 inline script가 첫 페인트 전에 `--font-scale`을 정확히 세팅해두는데도, `FontScaleProvider`의 CSS 변수 적용 `useEffect`가 마운트 시점에 `fontSize` state의 초기값("보통"/100%)으로 무조건 한 번 더 실행되면서 그 값을 덮어썼다가, localStorage를 읽는 effect가 끝난 뒤에야 다시 원래 크기로 돌아가는 깜빡임이 있었음("글자 크게" 설정한 사용자는 페이지 열 때마다 전체가 작아졌다 커지는 것처럼 보임). `useRef`로 최초 1회만 이 effect를 건너뛰도록 수정.
+  - **회원 전용 섹션(홈의 "전체 학습 진도율" 등)**: `useIsLoggedIn()`이 항상 `false`로 시작해서 `useEffect`(브라우저가 화면을 그린 *뒤*에 실행)로 보정하는 구조라, 실제로는 로그인된 사용자도 아주 잠깐 게스트 화면(회원 전용 섹션 없음)이 먼저 보였다가 회원 화면으로 바뀌면서 아래 카드들이 밀리는 현상이 있었음. `useEffect`를 화면이 그려지기 *직전*에 동기 실행되는 `useLayoutEffect`(SSR 경고 방지용 isomorphic 래퍼 포함)로 교체 — 하이드레이션 안전성은 그대로 유지하면서(서버·클라이언트 첫 렌더는 여전히 동일하게 게스트로 일치) 보정이 페인트 전에 끝나 화면엔 밀림 없이 바로 회원 화면이 보임.
+- 비고: Playwright로 두 가지 다 재현·검증함 — (1) `--font-scale`을 40회 연속 샘플링해 fontscale이 로드 내내 한 번도 흔들리지 않는 것 확인, (2) 앱 안에서 실제로 링크 클릭해 `/home`으로 이동했을 때 홈 화면 고유 텍스트가 뜨는 바로 그 순간 "전체 학습 진도율" 섹션도 이미 같이 떠 있는 것 확인(완전 새로고침 시 JS 로딩 전 SSR 전용 구간이 잠깐 보이는 건 모든 웹앱에 존재하는 불가피한 현상이라 별개).
+
+## [2026-07-24] 설정 화면 TTS 음성 선택 — 마운트 시 V1로 깜빡이던 것 제거
+- 수정 파일: `src/app/(main)/settings/page.tsx`
+- 변경 내용: `ttsVoice`가 `useState("V1")` + 마운트 `useEffect`에서 저장된 값으로 뒤늦게 보정하는 구조라, 페이지를 열 때마다 아주 짧게 V1이 선택된 것처럼 보였다가 실제 설정으로 바뀌는 깜빡임이 있었음(하이드레이션 안전 패턴이라 의도된 동작이었지만, 사용자가 깜빡임 자체를 없애달라고 요청). `FontScaleProvider`와 동일한 방식으로, lazy initializer로 마운트 시점에 바로 저장된 값을 읽어오도록 바꾸고, `PillButton`에 `suppressHydrationWarning`을 추가해 서버·클라이언트 첫 렌더 차이로 인한 하이드레이션 경고만 억제함 — 화면에는 깜빡임 없이 항상 올바른 값이 바로 그려짐.
+
+## [2026-07-24] 매일 학습 알림 — 껐다가 다시 켜면 알림 시각을 현재 시각으로 초기화
+- 수정 파일: `src/app/(main)/settings/page.tsx`
+- 변경 내용: 알림 시/분은 최초 방문자에게만 현재 시각을 기본값으로 주고, 이후로는 껐다 켜도 예전에 맞춰둔 시각이 `localStorage`에 그대로 남아있어서 계속 재사용됐음(이미 지난 시각이면 스케줄이 자동으로 다음날로 넘어가 버려 "안 온다"는 착각을 주기 쉬움). `handleToggleReminder`에서 토글을 켤 때마다 시/분을 현재 시각으로 재설정하도록 수정.
+- 비고: 알림이 아예 안 뜨는 문제는 사용자 PC에서 직접 `new Notification(...)`을 콘솔에서 실행해도 화면에 표시되지 않는 것까지 확인 — `Notification.permission`은 `"granted"`인데 실제 표시가 안 되는 건 앱 코드가 아니라 Windows 알림 설정(Focus Assist 자동 규칙 등) 쪽 문제로 보임. 코드 상에서는 예약 로직 자체가 정상 동작하는 것으로 확인됨(원격/화면 공유 세션 중이면 Focus Assist의 "디스플레이 복제 시" 자동 규칙이 유력한 원인).
+
+## [2026-07-24] 긴급 신고 화면 — PC에서 "신고" 클릭 시 안내 토스트 추가
+- 수정 파일: `src/app/(main)/emergency/page.tsx`
+- 변경 내용: "신고" 버튼은 `tel:` 링크라 실제 연결 성공/실패를 코드로 알 방법이 없고, PC처럼 전화 앱이 없는 환경에서는 클릭해도 브라우저가 아무 반응도 안 보여줘서 버튼이 고장난 것처럼 느껴진다는 피드백. 터치 기반 입력 환경인지(`matchMedia("(hover: none) and (pointer: coarse)")`)로 모바일 여부를 판별해, 모바일이 아니면 `tel:` 이동을 막고 "이 기능은 모바일 기기에서 사용할 수 있어요" 토스트를 2.5초간 보여주도록 함. 모바일에서는 기존과 동일하게 `tel:` 링크가 그대로 실행됨. Playwright로 데스크톱 뷰포트(토스트 노출)와 iPhone 13 에뮬레이션(토스트 없이 `tel:` 링크 유지) 둘 다 확인함.
+
+## [2026-07-24] "이어서 학습하기" 판단 기준을 isCompleted(고정값)에서 resume 존재 여부로 수정
+- 수정 파일: `src/lib/progress.ts`, `src/app/(main)/home/page.tsx`, `src/app/(main)/learn/page.tsx`
+- 변경 내용: 바로 전 수정(진행률을 최신 방문 기준으로 표시)과 맞물려 생긴 버그 — `readProgressSnapshot`의 `recentInProgressCaseId`와 홈/학습하기 화면의 `continueHref`가 여전히 `isCompleted`(한 번 true가 되면 계속 유지되는 값)로 "진행 중인지"를 판단하고 있어서, 예전에 완료했던 케이스를 방금 다시 진행하다 중간에 나가도 "이어서 학습하기"가 아니라 "최근 학습한 사례"로 뜨고 상세 페이지로만 연결됐음(완료율 숫자 자체는 최신으로 잘 내려가는데 카드는 그걸 못 따라감). `resume`은 `finalQuiz`(진짜 완료) 도달 시에만 지워지는 값이라 "지금 이어서 할 게 있는지"의 정확한 신호이므로, 판단 기준을 전부 `resume` 존재 여부로 교체. Playwright로 `isCompleted:true`인 케이스를 재도전 중 상태로 재현해 "이어서 학습하기" + `call/progress` 직결까지 확인함.
+
+## [2026-07-24] 진행률을 최신 방문 기준으로 표시 + 시나리오 상세 페이지 완료율 미반영 버그 수정
+- 수정 파일: `src/lib/progress.ts`, `src/components/cards/CaseStatsGrid.tsx`
+- 변경 내용:
+  - `recordCaseProgress`가 지금까지 "이전 기록보다 진행률이 낮으면 값을 유지"했던 것을, 완료(`isCompleted`) 기록은 한 번 찍히면 계속 유지하되 **`completionRate` 숫자 자체는 항상 이번 방문에서 도달한 단계를 그대로 반영**하도록 변경. 예전에 100%까지 끝낸 케이스를 재도전해서 이번엔 중간까지만 갔다면, "완료 학습" 기록(배지 등)은 그대로 남지만 진행률 숫자는 이번 시도 기준으로 낮게 표시됨(사용자 확인 후 진행: "완료 기록은 유지, 진행률 숫자만 최신화").
+  - `learn/[caseId]`(시나리오 상세) 페이지가 서버 컴포넌트라 `localStorage` 기반 진행 기록을 전혀 읽지 못해, 완료율 셀이 항상 백엔드 원본값(0%)으로만 표시되던 버그 발견·수정. 이미 클라이언트 컴포넌트인 `CaseStatsGrid`가 마운트 후 직접 `readProgressSnapshot()`으로 실제 진행률을 덮어쓰도록 해서, 서버 컴포넌트를 건드리지 않고 해결. `home`/`learn` 목록처럼 이미 `applyProgressOverride`를 거쳐 온 곳에서는 같은 값을 다시 읽는 것이라 결과 차이 없음.
+
+## [2026-07-24] "이어서 학습하기"가 중단했던 정확한 지점(전화/문자, 대사·퀴즈 위치)부터 재개하도록 개선
+- 수정 파일: `src/lib/progress.ts`(`ResumeState`, `CaseChannel` 타입 및 `recordCaseProgress` 시그니처 추가), `src/app/learn/[caseId]/call/progress/page.tsx`, `src/app/learn/[caseId]/message/progress/page.tsx`, `src/app/(main)/home/page.tsx`, `src/app/(main)/learn/page.tsx`
+- 변경 내용: 지금까지 홈/학습하기 화면의 "이어서 학습하기"·"최근 학습한 사례" 카드는 항상 시나리오 상세 페이지(`/learn/[caseId]`)로만 연결됐고, 실제 전화/문자 시뮬레이션에 다시 들어가면 매번 대사 처음부터 다시 재생됐음. 게다가 진행 기록 자체가 전화(voice)로 했는지 문자(message)로 했는지조차 구분해 저장하지 않아서 애초에 "어디로 보내야 할지" 알 수 없는 상태였음.
+  - `recordCaseProgress`가 이제 `{channel, revealedCount, quizIndex, answers}` 형태의 재개 스냅샷(`resume`)을 같이 저장할 수 있도록 시그니처 확장 — 완료(`finalQuiz`) 시점엔 재개할 지점이 없으므로 자동으로 지움.
+  - `call/progress`(전화)·`message/progress`(문자) 두 화면 모두 마운트 시 저장된 `resume`이 있으면 그 지점(공개된 대사/메시지 개수, 몇 번째 판단 퀴즈, 지금까지 고른 답)부터 상태를 복원하고, 대사·메시지 자동 재생 루프도 처음(0)이 아니라 복원된 지점부터 이어서 재생하도록 수정. 선택 직후 900ms 텀 사이에 저장이 겹쳐 이미 답한 문항에 인덱스가 멈춰있는 경우를 대비해 한 칸 보정하는 방어 로직도 추가.
+  - 홈/학습하기 화면은 진행 중인(완료되지 않은) 케이스면 저장된 `resume.channel`을 보고 `call/progress` 또는 `message/progress`로 직접 연결하고, 완료된 케이스(또는 재개 정보가 없는 경우)는 기존처럼 시나리오 상세 페이지로 연결.
+- 비고: Playwright로 `voiceshield-case-progress`에 `revealedCount:2`짜리 재개 스냅샷을 심어두고 확인 — 홈 화면 카드가 상세 페이지가 아니라 `/learn/case-mobile-repair/call/progress`로 바로 연결되고, 실제로 2번째 대사부터 이어서 재생되는 것까지 확인함. 마무리 퀴즈(`call/quiz`)는 단일 문항이라 재개 없이 항상 새로 시작하도록 범위에서 제외.
+
+## [2026-07-24] 홈/학습하기 화면 "이어서 학습하기·최근 학습한 사례" — 진행 중인 케이스가 없으면(전부 완료) 최근 완료한 케이스라도 보여줌
+- 수정 파일: `src/lib/progress.ts`(`pickMostRecentCaseId` 추가), `src/app/(main)/home/page.tsx`, `src/app/(main)/learn/page.tsx`
+- 변경 내용: `readProgressSnapshot().recentInProgressCaseId`는 완료되지 않은 케이스만 대상으로 하기 때문에, 진행했던 케이스를 전부 끝까지 완료한 사용자는 이 값이 `null`이 되어 홈/학습하기 화면에 해당 카드 자체가 안 뜨는 문제가 있었음(실제 사용자 데이터로 재현·확인: 두 케이스 다 `isCompleted:true`인 상태). 진행 중인 케이스가 없을 때는 완료 여부와 무관하게 가장 최근에 손댄 케이스를 대신 보여주도록 `pickMostRecentCaseId` 헬퍼를 추가하고 두 화면 모두에 적용. 홈 화면은 카드 제목도 이 경우 "이어서 학습하기" 대신 "최근 학습한 사례"로 바꿔 완료된 걸 "이어서" 하라는 것처럼 보이지 않게 함(학습하기 화면은 원래부터 제목이 항상 "최근 학습한 사례"라 별도 분기 불필요).
+
+## [2026-07-24] 회원 탈퇴 API 연결 + 실제 닉네임 표시 + 남아있던 mock 로그인 경로 수정
+- 생성/수정 파일: `src/lib/api/auth.ts`(`fetchMyProfile`, `withdrawMembership` 추가), `src/lib/api/client.ts`, `src/lib/api/types.ts`(`MemberMeResponse`에 `name`/`nickname` 추가), `src/app/(main)/home/page.tsx`, `src/app/(main)/settings/account/page.tsx`, `src/components/auth/GuestSaveProgressCard.tsx`, `src/components/auth/LoginPromptModal.tsx`, `src/app/(main)/record/page.tsx`, `src/app/learn/[caseId]/call/quiz/page.tsx`
+- 변경 내용:
+  - `client.ts`의 `apiFetch`가 `body.data === null`이면 무조건 에러로 던졌는데, `DELETE /members/me`처럼 성공해도 응답 본문이 아예 없는(또는 `data:null`인) 엔드포인트가 있어 정상 처리가 안 됐음 — 응답 본문이 비어있으면 성공으로 간주해 `null`을 반환하고, `success` 플래그만으로 성공/실패를 판단하도록 수정.
+  - `withdrawMembership()`(`DELETE /api/v1/members/me`) 연결 — `settings/account` 탈퇴 페이지의 "제출하기"가 이제 실제로 API를 호출하고, 성공했을 때만 "탈퇴 완료" 모달을 보여주도록 흐름을 바꿈(기존엔 API 호출 없이 항상 완료 모달부터 띄웠음). 실패 시 에러 메시지 표시 + 재시도 가능. 완료 확인 시 `setStoredUserId(null)`도 같이 호출해 다음 로그인에서 이전 사용자 ID가 남아있지 않게 함.
+  - `fetchMyProfile()`(`GET /api/v1/members/me`)로 실제 닉네임을 가져와 홈 화면의 "안녕하세요, 홍길동 님!"(하드코딩된 placeholder였음)을 실제 로그인한 회원의 닉네임으로 교체. 백엔드가 아직 `name`/`nickname`을 채워주지 않는 회원은 "회원"으로 폴백.
+  - **버그 발견 및 수정**: `GuestSaveProgressCard`/`LoginPromptModal`(회원 전용 기능 시도 시 뜨는 게스트용 로그인 유도 UI)이 실제 카카오 OAuth를 전혀 거치지 않고 `localStorage`에 로그인 플래그만 직접 켜는 예전 mock 로그인 코드를 그대로 쓰고 있었음 — 메인 로그인 화면(`/`)만 실제 OAuth로 교체하고 이 두 곳은 놓쳤던 것. 그 결과 이 경로로 로그인하면 `voiceshield-logged-in`은 `true`인데 실제 `X-User-Id`(`voiceshield-api-user-id`)가 전혀 저장되지 않아, 로그인된 것처럼 보여도 모든 인증이 필요한 API 호출(`/members/me` 등)이 조용히 실패하는 상태였음(사용자가 "닉네임이 안 뜬다"고 확인 요청하는 과정에서 발견). 두 컴포넌트의 "Kakao로 시작하기" 버튼을 `getKakaoAuthorizeUrl()`로 리다이렉트하도록 수정하고, 더 이상 의미 없어진 `onLoggedIn` 콜백 prop은 제거(리다이렉트로 페이지를 완전히 떠나므로 콜백이 실행될 기회가 없음).
+- 비고: 실제 회원(`user-796e9c18-...`)으로 `GET /members/me` 호출해 응답을 직접 확인한 결과 `name`/`nickname`이 스키마엔 추가됐지만 값은 항상 `null` — 백엔드가 카카오 회원정보 API(`GET https://kapi.kakao.com/v2/user/me`)를 호출해서 채워주는 로직이 아직 없는 것으로 보임(프론트는 이미 값이 오면 바로 쓸 수 있게 준비됨). 카카오 동의항목에 "닉네임"이 켜져 있는지도 별도 확인 필요.
+
+## [2026-07-24] 기관사칭 아이콘 크기 불일치 수정 (학습 기록 취약 유형 배지 + 학습하기/시나리오 상세 헤더)
+- 수정 파일: `src/app/(main)/record/page.tsx`, `src/lib/case-meta.ts`
+- 변경 내용:
+  - `record/page.tsx`의 `CategoryIcon`이 기관사칭(institution) 카테고리일 때 배지 크기(`size` prop)와 무관하게 항상 `lib/case-meta.ts`의 홈 화면용 고정 상수(`INSTITUTION_ICON_SIZE`, 최대 19px)를 썼음 — "취약 유형" 배지(`WeakCategoryTag`)처럼 훨씬 작은 배지(최대 10px)에서 쓰면 아이콘이 배지 크기 대비 과도하게 커서 다른 3개 카테고리 아이콘과 비교했을 때 눈에 띄게 크고 배지 밖으로 삐져나오는 것처럼 보였음. 고정 상수 대신 전달받은 `size`에 비례(`calc(${size} * 1.15)`)하도록 수정하고, 다른 3개 아이콘의 기본 크기도 `clamp(8px,2.6cqw,10px)` → `clamp(10px,3cqw,12px)`로 올려 격차를 완화.
+  - `lib/case-meta.ts`의 `INSTITUTION_ICON_SIZE_LEARN`(학습하기 목록/시나리오 상세 헤더용)은 다른 카테고리 아이콘이 고정 12px(`size-3`)인데 상한이 13px라, 넓은 컨테이너에서 다른 아이콘보다 커 보이는 문제가 있었음 — 상한을 12px로 낮춰 어떤 컨테이너 폭에서도 다른 아이콘을 넘지 않게 함(narrow 뷰포트에서만 재현되던 문제가 아니라 컨테이너 쿼리 특성상 넓은 화면에서 더 커지는 문제라, 375~1024px 여러 폭에서 재검증함).
+- 비고: GoOrganization 아이콘이 오른쪽에 작은 돌출부(문고리) 디테일이 있어 기하학적으로 중앙 정렬해도 시각적으로 오른쪽(또는 보정 후 위쪽)으로 쏠려 보이는 광학 착시가 있었으나, 사용자가 배지 크기 수정 이후로는 "지금 상태로 충분하다"고 판단해 광학 보정(`translateX`)은 적용하지 않고 순수 기하학적 중앙 정렬로 유지하기로 함.
+
+## [2026-07-24] 전화 대화 스크립트(scriptLines) 파싱 버그 수정 + 발신자 표시 이름 개선
+- 수정 파일: `src/lib/api/adapt.ts`
+- 변경 내용:
+  - 백엔드가 `case-mobile-repair`(가족 사칭)에 실제 VOICE 대화 스크립트를 채워 넣은 뒤 발견된 버그. 기존 `buildDialogue`는 `scriptLines` 배열을 그냥 짝수/홀수 인덱스로 번갈아 caller/user에 매핑했는데, 실제 API의 `scriptLines`는 "나"/"사기범" 같은 화자 이름 토큰과 대사 조각이 한 배열에 평탄화되어 섞여 있는 형식이었음(긴 대사는 줄바꿈 단위로 여러 항목에 걸쳐 쪼개짐) — 그 결과 "나"/"사기범" 글자 자체가 말풍선 내용으로 그대로 노출되는 문제가 있었음. 문장부호 없는 짧은 토큰(≤6자)을 화자 이름으로 인식하고, 다음 화자 이름이 나올 때까지의 조각들을 이어붙여 하나의 말풍선으로 합치도록 파서를 다시 작성. 화자 이름이 나오기 전의 지문(`"[전화벨]"` 등)은 말풍선으로 표시하지 않고 건너뜀.
+  - `callerLabel`(통화 화면에서 발신자로 표시할 이름)이 케이스 제목을 그대로 재사용해 "휴대폰 고장" 같은 시나리오 제목이 발신자 이름 자리에 뜨는 게 부자연스럽다는 피드백을 받아, `CASE_CATEGORY_LABEL` 기반 카테고리 일반명 + "범"(예: "가족 사칭범")으로 대체.
+- 비고: 서버 렌더링된 `learn/case-mobile-repair` HTML을 직접 확인해 `phoneDialogue`가 정상적으로 화자별로 합쳐지고 `callerLabel`이 "가족 사칭범"으로 뜨는 것까지 검증함. 이 케이스는 VOICE 채널 퀴즈도 실제 데이터로 채워져 있어(`case-mobile-repair-voice-quiz-1`), 백엔드가 콘텐츠를 점진적으로 채우고 있는 것으로 보임 — 다른 화자 이름 토큰이 추가되면 `SPEAKER_LABEL_TO_SPEAKER`에 매핑을 추가해야 함(미등록 토큰은 기본적으로 "caller"로 처리).
+
+## [2026-07-24] 판단 퀴즈 채점/완료 처리를 실제 백엔드 API와 연동
+- 수정 파일: `src/types/index.ts`(`QuizQuestion.optionIds` 추가), `src/lib/api/adapt.ts`, `src/app/learn/[caseId]/call/progress/page.tsx`, `src/app/learn/[caseId]/message/progress/page.tsx`, `src/app/learn/[caseId]/call/quiz/page.tsx`
+- 변경 내용:
+  - 지금까지 퀴즈 정답 여부는 어댑터가 미리 계산해둔 `answerIndex`로 클라이언트에서만 채점하고, 정답 설명도 "정답 여부는 학습 결과 화면에서..." 같은 고정 문구를 보여주고 있었음. 이제 선택지를 고르는 시점에 실제 `POST /api/v1/cases/{scenarioId}/variants/{channel}/choices`(`evaluateChoice`)를 호출해서, 백엔드가 실제로 생성한 상세 해설(`explanation`)을 받아와 있으면 그걸로 교체(실패 시 기존 고정 문구로 폴백이라 화면이 깨지지 않음). 이를 위해 `QuizQuestion`에 `choices`와 같은 순서의 실제 `optionId` 배열(`optionIds`)을 추가하고, 어댑터(`buildQuiz`)가 채워주도록 함.
+  - 전화 시뮬레이션 판단 퀴즈 완료 시점(`call/progress`의 `quiz.length` 도달), 문자 시뮬레이션 판단 퀴즈 완료 시점(`message/progress`)에 로그인 상태(`getStoredUserId()`)일 때만 `POST /learning/scenarios/{id}/simulation-complete`(`markSimulationComplete`)를 호출하도록 추가. 마무리 퀴즈("call/quiz") 제출 시점에는 같은 조건으로 `POST /learning/scenarios/{id}/quiz-complete`(`markQuizComplete`) 호출 추가. 둘 다 결과를 기다리지 않는 fire-and-forget이라 실패해도 화면 흐름에 영향 없음 — 기존 `localStorage` 기반 `recordCaseProgress` 기록은 그대로 유지(백엔드 기록은 부가적으로만 추가).
+- 비고: Playwright로 `case-fire-agency` 문자 시뮬레이션에서 정답 선택 시 실제 백엔드가 생성한 해설 문구("법령 개정, 안전점검, 정부 지원사업은 실제로 있을 수 있는 내용입니다...")가 화면에 뜨는 것까지 확인함.
+
+## [2026-07-24] 카카오 로그인 콜백 — Strict Mode 이중 호출로 인한 401 실패 수정
+- 수정 파일: `src/app/auth/kakao/callback/page.tsx`
+- 변경 내용: 실제 카카오 계정으로 로그인 시도 시 매번 401로 실패하는 버그 발생. 카카오 인가 코드는 1회용인데, React 19 Strict Mode(개발 모드)가 마운트 effect를 두 번 실행하면서 `loginWithKakao(code)`가 같은 코드로 두 번 호출됐고, 두 번째 호출은 이미 소모된 코드라 백엔드가 401을 반환한 것이 원인. `call/analysis/page.tsx`와 동일한 `useRef` 기반 dedup 가드(`hasFetchedRef`)를 추가해 effect 본문이 실질적으로 한 번만 실행되도록 수정.
+
+## [2026-07-24] mock-cases.ts 제거 — 학습 데이터 전체를 실제 백엔드 API로 교체
+- 삭제 파일: `src/lib/mock-cases.ts`
+- 생성 파일: `src/lib/api/adapt.ts`, `src/lib/api/case-data.ts`
+- 수정 파일: `src/lib/case-meta.ts`(`CASE_CATEGORY_LABEL` 이전), `src/lib/progress.ts`, `src/lib/api/client.ts`, `src/app/(main)/home/page.tsx`, `src/app/(main)/learn/page.tsx`, `src/app/(main)/learn/[caseId]/page.tsx`, `src/app/(main)/record/page.tsx`, `src/app/learn/[caseId]/call/page.tsx`, `src/app/learn/[caseId]/call/progress/page.tsx`, `src/app/learn/[caseId]/call/quiz/page.tsx`, `src/app/learn/[caseId]/message/progress/page.tsx`, `src/components/cards/ScenarioCard.tsx`
+- 변경 내용:
+  - `src/lib/api/adapt.ts` — 실제 백엔드 응답(`CategoryCaseSummaryResponse`, `CaseScenarioResponse`, `CaseScenarioStepResponse` 등)을 기존 `PhishingCase` 형태로 변환하는 어댑터. 백엔드에 없는 필드(`summary`/`realCaseExample`/`exampleMessage`/`recommendation`/`callerLabel` 등)는 케이스명 기반 안내문이나 고정값으로 채우고, `scriptLines`가 빈 배열이거나 `quiz`가 `null`인 경우(현재 대부분의 실제 데이터)를 위한 플레이스홀더 퀴즈(`PLACEHOLDER_QUIZ`)로 방어.
+  - `src/lib/api/case-data.ts` — `fetchAllCaseSummaries()`(카테고리 전체 순회해 목록용 케이스 배열 생성), `fetchCaseDetail(scenarioId)`(시나리오 상세 + VOICE/MESSAGE 두 채널의 scenario-step까지 합쳐 시뮬레이션 화면용 완전한 케이스 생성).
+  - `src/lib/progress.ts`의 `applyProgressOverrideToAll`이 더 이상 `MOCK_CASES`를 직접 참조하지 않고 케이스 배열을 인자로 받도록 시그니처 변경 — 호출부(`home`, `record`)가 `fetchAllCaseSummaries()`로 받아온 배열을 넘겨줌.
+  - `src/lib/api/client.ts`의 `"use client"` 지시어 제거 — `learn/[caseId]/page.tsx`가 서버 컴포넌트에서 직접 호출할 수 있어야 했고, 어차피 fetch/localStorage 가드는 서버·클라이언트 양쪽에서 안전하게 동작함. 그 결과 `learn/[caseId]` 상세 페이지는 서버에서 데이터를 가져오므로 브라우저 CORS 제약을 받지 않고 지금 바로 정상 동작함(실제 확인: case-fire-agency의 실제 문자 퀴즈 데이터까지 정상 렌더링).
+  - `call/progress`, `call/quiz`, `message/progress` 페이지는 기존에 `getCaseById()`를 컴포넌트 본문에서 동기 호출하던 구조를, `useState(null)` + 마운트 `useEffect`에서 비동기로 불러온 뒤 모든 훅 선언이 끝난 지점에 로딩/실패 가드(`불러오는 중...`, `notFound()`)를 두는 구조로 변경 — 훅 호출 순서 규칙을 지키기 위해 `answers` 등 케이스 형태에 의존하던 `useState` 초기값도 빈 배열로 바꾸고 데이터 로드 시점에 채우도록 조정.
+  - `call/progress`에서 실제 API처럼 판단 퀴즈가 아예 없는 시나리오(`quiz.length === 0`)를 만나면 대화가 끝나자마자 퀴즈 단계를 건너뛰고 바로 완료 화면으로 전환하도록 방어 로직 추가(안 그러면 퀴즈 카드가 하나도 안 뜬 채 멈춰버림).
+- 비고: 실제 백엔드는 카테고리 4개(메신저사기 없음)·사례 4개뿐이고, 케이스 하나(case-fire-agency의 문자 채널)를 빼면 대화 스크립트·퀴즈가 전부 비어 있음 — 사용자 확인 하에 "일단 다 연동하고 빈 값은 안전한 기본값으로 방어, 콘텐츠는 백엔드가 추후 채움" 방향으로 진행. `home`/`learn`/`record`/`call/progress`/`call/quiz`/`message/progress`는 브라우저에서 fetch하므로 백엔드 CORS 설정이 열리기 전까지는 실제 데이터 확인 불가(코드는 완성, 검증만 대기).
+
+## [2026-07-24] 카카오 로그인 실제 OAuth 연동
+- 생성 파일: `src/lib/kakao.ts`, `src/lib/api/auth.ts`, `src/app/auth/kakao/callback/page.tsx`
+- 수정 파일: `src/app/page.tsx`, `src/lib/routes.ts`, `src/app/(main)/settings/page.tsx`, `.env.local`
+- 변경 내용: 로그인 화면의 "Kakao로 시작하기"가 더 이상 localStorage 플래그만 세팅하지 않고, 실제 카카오 authorize URL(`https://kauth.kakao.com/oauth/authorize`)로 리다이렉트하도록 변경. `/auth/kakao/callback`에서 인가 코드(`code`)를 받아 `POST /api/v1/auth/kakao`로 교환 → `signupStatus`가 `SIGNUP_COMPLETE`가 아니면 `POST /api/v1/members`로 회원 생성 → 성공 시 `AUTH_STORAGE_KEY`를 `true`로 설정하고 `/home`으로 이동. 응답받은 `userId`는 `setStoredUserId`로 저장해 이후 모든 API 요청의 `X-User-Id` 헤더로 사용. 설정 화면 로그아웃 시 이 저장된 userId도 함께 초기화하도록 `setStoredUserId(null)` 추가(빠뜨리면 로그아웃 후에도 이전 회원의 X-User-Id가 계속 전송되는 문제가 있었음).
+- 비고: `NEXT_PUBLIC_KAKAO_REST_API_KEY`/`NEXT_PUBLIC_KAKAO_REDIRECT_URI`는 카카오 디벨로퍼스 앱 키 발급 후 `.env.local`에 직접 입력 필요(현재는 빈 값/localhost 콜백으로 플레이스홀더만 추가됨). 실기기/브라우저 테스트는 키 입력 후 진행 예정.
+
+## [2026-07-24] 긴급 신고 안내 화면 report-guides API 연동
+- 수정 파일: `src/app/(main)/emergency/page.tsx`
+- 생성 파일: `src/lib/api/report.ts` (`fetchReportGuide`)
+- 변경 내용: 하드코딩돼 있던 `EMERGENCY_CONTACTS`/`DAMAGE_RESPONSE`/`PREVENTION_TIPS`를 제거하고, 실제 백엔드 `GET /api/v1/report-guides` 응답(`reportSteps`/`emergencyContacts`/`realActionGuide`/`preventionTips`)을 그대로 사용하도록 변경. API 실패 시(`ApiUnavailableError`) 기존 하드코딩 문구를 그대로 담은 `FALLBACK_GUIDE`로 조용히 대체. 연락처 카드의 태그/그라디언트 색상은 API가 내려주지 않는 스타일 정보라 전화번호 기준 매핑(`CONTACT_TAGS_FALLBACK`)으로 유지.
+
 ## [2026-07-21] 홈 화면 게스트 로그인 버튼의 화살표 아이콘 광학 정렬 보정
 - 수정 파일: `src/app/(main)/home/page.tsx`
 - 변경 내용: "로그인 >" 버튼의 좌우 패딩이 기하학적으로는 동일했지만(13px/13px), 화살표 아이콘(`IoIosArrowForward`) 자체의 SVG 내부 여백이 비대칭이라 시각적으로는 오른쪽이 더 넓어 보였음. `pr-2`/`pl-3`로 비대칭 패딩을 주고 아이콘에 `-mr-1`을 추가해 광학적으로 중앙에 오도록 보정.

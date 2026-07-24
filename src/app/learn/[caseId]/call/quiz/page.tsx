@@ -5,9 +5,12 @@ import { useRouter, notFound } from "next/navigation";
 import { FiX } from "react-icons/fi";
 import { RiCheckboxCircleFill } from "react-icons/ri";
 import { MdOutlineReplay, MdCancel } from "react-icons/md";
-import { getCaseById, MOCK_CASES } from "@/lib/mock-cases";
+import { fetchCaseDetail, fetchAllCaseSummaries } from "@/lib/api/case-data";
+import { evaluateChoice } from "@/lib/api/cases";
+import { markQuizComplete } from "@/lib/api/learning";
+import { getStoredUserId } from "@/lib/api/client";
 import { ROUTES } from "@/lib/routes";
-import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { AUTH_STORAGE_KEY, useIsomorphicLayoutEffect } from "@/lib/auth";
 import { playFeedbackTone } from "@/lib/sound";
 import { recordCaseProgress } from "@/lib/progress";
 import { useStudyTimeTracker } from "@/lib/daily-stats";
@@ -15,29 +18,59 @@ import { RecommendedCard } from "@/components/cards/RecommendedCard";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { ExitConfirmModal } from "@/components/learn/ExitConfirmModal";
 import { GuestSaveProgressCard } from "@/components/auth/GuestSaveProgressCard";
+import type { PhishingCase } from "@/types";
 
 const HEADER_GRADIENT = "linear-gradient(165deg, #1a2035 0%, #2d1f4e 100%)";
 
 export default function FinalQuizPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
   const router = useRouter();
-  const phishingCase = getCaseById(caseId);
-  if (!phishingCase) notFound();
 
   useStudyTimeTracker();
 
+  const [phishingCase, setPhishingCase] = useState<PhishingCase | null>(null);
+  const [recommended, setRecommended] = useState<PhishingCase | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [realExplanation, setRealExplanation] = useState<string | null>(null);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
+  useIsomorphicLayoutEffect(() => {
     setIsLoggedIn(localStorage.getItem(AUTH_STORAGE_KEY) === "true");
   }, []);
 
-  const recommended = MOCK_CASES.find((c) => c.id !== caseId) ?? MOCK_CASES[0];
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([fetchCaseDetail(caseId), fetchAllCaseSummaries()])
+      .then(([detail, summaries]) => {
+        if (cancelled) return;
+        if (!detail) {
+          setLoadFailed(true);
+          return;
+        }
+        setPhishingCase(detail);
+        setRecommended(summaries.find((c) => c.id !== caseId) ?? summaries[0] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId]);
+
+  if (loadFailed) notFound();
+  if (!phishingCase) {
+    return (
+      <div className="flex h-full items-center justify-center bg-gray-100">
+        <p className="text-sm text-gray-500">불러오는 중...</p>
+      </div>
+    );
+  }
+
   const question = phishingCase.finalQuiz;
   const isCorrect = selected !== null && selected === question.answerIndex;
   const isDone = selected !== null;
@@ -116,6 +149,16 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
                   playFeedbackTone(pendingChoice === question.answerIndex);
                   recordCaseProgress(caseId, "finalQuiz");
                   setSelected(pendingChoice);
+
+                  const optionId = question.optionIds?.[pendingChoice];
+                  if (optionId) {
+                    evaluateChoice(phishingCase.id, "VOICE", optionId)
+                      .then((res) => {
+                        if (res.explanation) setRealExplanation(res.explanation);
+                      })
+                      .catch(() => {});
+                  }
+                  if (getStoredUserId()) markQuizComplete(phishingCase.id).catch(() => {});
                 }}
                 className={`flex h-11.25 items-center justify-center rounded-lg border bg-white text-base font-bold ${
                   pendingChoice === null
@@ -157,13 +200,14 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
                     {isCorrect ? "정확합니다!" : "위험합니다"}
                   </p>
                   <div className="rounded-xl bg-gray-100 px-3.5 py-2.5">
-                    <p className="text-left text-xs leading-relaxed text-gray-700">{question.explanation}</p>
+                    <p className="text-left text-xs leading-relaxed text-gray-700">{realExplanation ?? question.explanation}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
                       setSelected(null);
                       setPendingChoice(null);
+                      setRealExplanation(null);
                     }}
                     className="flex cursor-pointer items-center gap-1 text-xs font-bold text-gray-600 [@media(hover:hover)_and_(pointer:fine)]:hover:text-gray-800"
                   >
@@ -173,16 +217,15 @@ export default function FinalQuizPage({ params }: { params: Promise<{ caseId: st
                 </div>
               </div>
 
-              <div className="mt-1 flex flex-col gap-2">
-                <p className="text-sm font-semibold text-[#1a2332]">다음 학습이 궁금하다면?</p>
-                <RecommendedCard href={ROUTES.scenario(recommended.id)} phishingCase={recommended} />
-              </div>
+              {recommended && (
+                <div className="mt-1 flex flex-col gap-2">
+                  <p className="text-sm font-semibold text-[#1a2332]">다음 학습이 궁금하다면?</p>
+                  <RecommendedCard href={ROUTES.scenario(recommended.id)} phishingCase={recommended} />
+                </div>
+              )}
 
               {!isLoggedIn && (
-                <GuestSaveProgressCard
-                  onLoggedIn={() => setIsLoggedIn(true)}
-                  style={{ backgroundImage: HEADER_GRADIENT }}
-                />
+                <GuestSaveProgressCard style={{ backgroundImage: HEADER_GRADIENT }} />
               )}
             </>
           )}

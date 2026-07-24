@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AiFillStar, AiOutlineStar } from "react-icons/ai";
 import { DIFFICULTY_META } from "@/lib/case-meta";
 import { useIsLoggedIn } from "@/lib/auth";
+import { readProgressSnapshot } from "@/lib/progress";
 import type { PhishingCase } from "@/types";
 
 export function CaseStatsGrid({ phishingCase }: { phishingCase: PhishingCase }) {
@@ -10,6 +12,18 @@ export function CaseStatsGrid({ phishingCase }: { phishingCase: PhishingCase }) 
   // 완료율은 회원의 실제 학습 기록(lib/progress.ts)을 반영하는 값이라, 기록이 저장되지 않는
   // 게스트에게는 의미가 없어 셀 자체를 노출하지 않는다 (Figma 게스트 화면 기준).
   const isLoggedIn = useIsLoggedIn();
+  // 시나리오 상세 페이지(learn/[caseId])는 서버 컴포넌트라 localStorage를 못 읽어서 completionRate가
+  // 항상 백엔드 원본값(0)으로 내려온다 — 마운트 후 클라이언트에서 실제 진행 기록으로 덮어쓴다. home/learn 목록처럼
+  // 이미 applyProgressOverride를 거쳐 온 경우엔 같은 값을 다시 읽는 것이라 결과에 차이가 없다.
+  const [completionRate, setCompletionRate] = useState(phishingCase.completionRate);
+
+  useEffect(() => {
+    const override = readProgressSnapshot().overrides[phishingCase.id];
+    if (override) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
+      setCompletionRate(override.completionRate);
+    }
+  }, [phishingCase.id]);
 
   return (
     <div className="grid grid-cols-2 gap-1.5">
@@ -45,10 +59,10 @@ export function CaseStatsGrid({ phishingCase }: { phishingCase: PhishingCase }) 
             <div className="h-1 flex-1 overflow-hidden rounded-full bg-gray-200">
               <div
                 className="h-1 rounded-full bg-gradient-to-r from-blue-400 to-blue-600"
-                style={{ width: `${phishingCase.completionRate}%` }}
+                style={{ width: `${completionRate}%` }}
               />
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">{phishingCase.completionRate}%</span>
+            <span className="text-[11px] font-semibold text-slate-500">{completionRate}%</span>
           </div>
         </div>
       ) : (

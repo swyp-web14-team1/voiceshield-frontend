@@ -5,11 +5,12 @@ import Link from "next/link";
 import { FiChevronRight } from "react-icons/fi";
 import { IoCheckmarkCircle } from "react-icons/io5";
 import { BackHeader } from "@/components/layout/BackHeader";
-import { CATEGORY_META, DIFFICULTY_META, INSTITUTION_ICON_SIZE } from "@/lib/case-meta";
+import { CATEGORY_META, DIFFICULTY_META } from "@/lib/case-meta";
 import { ROUTES } from "@/lib/routes";
-import { AUTH_STORAGE_KEY } from "@/lib/auth";
+import { AUTH_STORAGE_KEY, useIsomorphicLayoutEffect } from "@/lib/auth";
 import { GuestSaveProgressCard } from "@/components/auth/GuestSaveProgressCard";
 import { applyProgressOverrideToAll, readProgressSnapshot, type ProgressSnapshot } from "@/lib/progress";
+import { fetchAllCaseSummaries } from "@/lib/api/case-data";
 import type { CaseCategory, PhishingCase } from "@/types";
 
 const EMPTY_PROGRESS_SNAPSHOT: ProgressSnapshot = { recentInProgressCaseId: null, overrides: {} };
@@ -42,7 +43,10 @@ function RecordSectionCard({ title, children }: { title: string; children: React
 function CategoryIcon({ category, size }: { category: CaseCategory; size: string }) {
   const meta = CATEGORY_META[category];
   const Icon = meta.Icon;
-  const iconSize = category === "institution" ? INSTITUTION_ICON_SIZE : size;
+  // 기관사칭 아이콘(GoOrganization)은 다른 커스텀 SVG보다 안쪽 여백이 많아 같은 크기로 두면 작아 보인다 —
+  // 다른 화면(home/learn)처럼 고정 상수로 대체하면 이 컴포넌트가 쓰이는 배지 크기(size)를 무시하게 되어
+  // 배지 밖으로 넘치는 문제가 있었다. 대신 전달받은 size에 비례해서 키운다.
+  const iconSize = category === "institution" ? `calc(${size} * 1.15)` : size;
   return (
     <div
       className="flex shrink-0 items-center justify-center rounded-lg"
@@ -83,7 +87,7 @@ function WeakCategoryTag({ category }: { category: CaseCategory }) {
         paddingBlock: "clamp(4px, 1.2cqw, 5.5px)",
       }}
     >
-      <CategoryIcon category={category} size="clamp(8px, 2.6cqw, 10px)" />
+      <CategoryIcon category={category} size="clamp(10px, 3cqw, 12px)" />
       <p className="break-keep font-semibold text-gray-600" style={{ fontSize: "clamp(10px, 2.8cqw, 12px)" }}>
         {meta.label}
       </p>
@@ -127,20 +131,29 @@ export default function RecordPage() {
   const [showAllCompleted, setShowAllCompleted] = useState(false);
   // localStorage 기반 진행 기록은 서버에서 읽을 수 없으므로, 초기값은 서버·클라이언트 동일하게 빈 스냅샷으로 고정하고
   // 실제 값은 마운트 후 useEffect에서 읽는다 (하이드레이션 불일치 방지).
+  const [allCases, setAllCases] = useState<PhishingCase[]>([]);
   const [progress, setProgress] = useState<ProgressSnapshot>(EMPTY_PROGRESS_SNAPSHOT);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // isLoggedIn은 전체 콘텐츠에 블러 처리를 씌우는 데 쓰여서, 화면이 그려진 뒤에 보정되면 게스트 화면(블러)이
+  // 잠깐 보였다가 회원 화면으로 바뀌는 게 눈에 띈다 — 그리기 전에 동기 실행되는 useLayoutEffect로 분리.
+  useIsomorphicLayoutEffect(() => {
+    setIsLoggedIn(localStorage.getItem(AUTH_STORAGE_KEY) === "true");
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage는 마운트 후에만 읽을 수 있어 불가피함
     setProgress(readProgressSnapshot());
-    setIsLoggedIn(localStorage.getItem(AUTH_STORAGE_KEY) === "true");
+    fetchAllCaseSummaries()
+      .then(setAllCases)
+      .catch(() => setAllCases([]));
   }, []);
 
-  const casesWithProgress = applyProgressOverrideToAll(progress);
+  const casesWithProgress = applyProgressOverrideToAll(allCases, progress);
   const completedCases = casesWithProgress.filter((c) => c.isCompleted);
   const totalCount = casesWithProgress.length;
   const completedCount = completedCases.length;
-  const progressPercent = Math.round((completedCount / totalCount) * 100);
+  const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   // 카테고리별 취약 여부는 AI 분석에서 나온 정답률(accuracy)을 우선 사용하고, 아직 분석을 본 적 없는
   // 카테고리는 completionRate(진행 단계)로 대신 판단한다.
@@ -268,7 +281,6 @@ export default function RecordPage() {
         {!isLoggedIn && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/10 px-4 backdrop-blur-md">
             <GuestSaveProgressCard
-              onLoggedIn={() => setIsLoggedIn(true)}
               style={{ backgroundColor: "#1a2035" }}
               className="w-full max-w-116.5"
               message="학습기록을 확인해보세요!"
